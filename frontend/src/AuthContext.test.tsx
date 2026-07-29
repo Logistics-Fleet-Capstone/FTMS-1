@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { AuthProvider, useAuth } from "./AuthContext";
@@ -11,8 +12,8 @@ function Consumer() {
   const auth = useAuth();
   return <div>
     <span>{auth.loading ? "loading" : auth.user?.username ?? "anonymous"}</span>
-    <button onClick={() => void auth.signIn("manager", "supplied-password")}>login</button>
-    <button onClick={() => void auth.signOut()}>logout</button>
+    <button onClick={() => void auth.signIn("manager", "supplied-password").catch(() => undefined)}>login</button>
+    <button onClick={() => void auth.signOut().catch(() => undefined)}>logout</button>
   </div>;
 }
 afterEach(() => { vi.restoreAllMocks(); });
@@ -69,4 +70,38 @@ test("unmount aborts unresolved bootstrap without post-unmount updates", () => {
   const { unmount } = render(<AuthProvider><Consumer /></AuthProvider>);
   unmount();
   expect(signal?.aborted).toBe(true);
+});
+
+test("StrictMode replay still handles login and aborts it on real unmount", async () => {
+  let loginSignal: AbortSignal | undefined;
+  vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+    const url = String(input);
+    if (url.includes("/auth/csrf/")) return json({ csrf_token: "token" });
+    if (url.includes("/auth/me/")) return json(null, 401);
+    loginSignal = init?.signal ?? undefined;
+    return new Promise(() => undefined);
+  });
+  const rendered = render(<StrictMode><AuthProvider><Consumer /></AuthProvider></StrictMode>);
+  await screen.findByText("anonymous");
+  fireEvent.click(screen.getByText("login"));
+  await waitFor(() => expect(loginSignal).toBeDefined());
+  rendered.unmount();
+  expect(loginSignal?.aborted).toBe(true);
+});
+
+test("StrictMode replay still handles logout and aborts it on real unmount", async () => {
+  let logoutSignal: AbortSignal | undefined;
+  vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+    const url = String(input);
+    if (url.includes("/auth/csrf/")) return json({ csrf_token: "token" });
+    if (url.includes("/auth/me/")) return json({ user });
+    logoutSignal = init?.signal ?? undefined;
+    return new Promise(() => undefined);
+  });
+  const rendered = render(<StrictMode><AuthProvider><Consumer /></AuthProvider></StrictMode>);
+  await screen.findByText("manager");
+  fireEvent.click(screen.getByText("logout"));
+  await waitFor(() => expect(logoutSignal).toBeDefined());
+  rendered.unmount();
+  expect(logoutSignal?.aborted).toBe(true);
 });

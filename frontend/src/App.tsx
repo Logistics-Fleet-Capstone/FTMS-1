@@ -19,33 +19,55 @@ function Protected({ children }: { children: React.ReactNode }) {
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
   const [logoutError, setLogoutError] = useState("");
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  const logoutInFlight = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   const submitLogout = async () => {
+    if (logoutInFlight.current) return;
+    logoutInFlight.current = true;
+    setLogoutBusy(true);
     setLogoutError("");
     try { await signOut(); }
     catch { if (mounted.current) setLogoutError("Unable to sign out. Please try again."); }
+    finally {
+      logoutInFlight.current = false;
+      if (mounted.current) setLogoutBusy(false);
+    }
   };
   return <main><section className="shell"><header className="app-header">
     <Link to="/vehicles"><strong>FTMS Vehicle Registry</strong></Link>
     <span>{user?.display_name} · {user?.role.replaceAll("_", " ")}</span>
-    <button onClick={() => void submitLogout()}>Sign out</button>
+    <button disabled={logoutBusy} onClick={() => void submitLogout()}>{logoutBusy ? "Signing out…" : "Sign out"}</button>
   </header>{logoutError && <p role="alert" className="message message--error">{logoutError}</p>}{children}</section></main>;
 }
 function LoginPage() {
   const { user, signIn } = useAuth(); const history = useHistory(); const location = useLocation();
   const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  const loginInFlight = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   if (user) return <Redirect to="/vehicles" />;
   const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setBusy(true); setError(""); const data = new FormData(event.currentTarget);
+    event.preventDefault();
+    if (loginInFlight.current) return;
+    loginInFlight.current = true;
+    setBusy(true); setError(""); const data = new FormData(event.currentTarget);
     try {
       await signIn(String(data.get("username")), String(data.get("password")));
       const requested = (location.state as { from?: string } | null)?.from;
       history.replace(safeInternalPath(requested));
     } catch { if (mounted.current) setError("Unable to sign in with those credentials."); }
-    finally { if (mounted.current) setBusy(false); }
+    finally {
+      loginInFlight.current = false;
+      if (mounted.current) setBusy(false);
+    }
   };
   return <main><section className="shell auth-card"><p className="eyebrow">Secure staff access</p><h1>Sign in to FTMS</h1>
     <form onSubmit={submit}><label>Username<input name="username" required autoComplete="username" /></label>
@@ -89,10 +111,15 @@ function VehicleForm({ editing = false }: { editing?: boolean }) {
   const { user } = useAuth(); const { deviceId = "" } = useParams<{ deviceId: string }>(); const history = useHistory();
   const [vehicle, setVehicle] = useState<Vehicle | null>(null); const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
   const mounted = useRef(true);
+  const submitInFlight = useRef(false);
   const submitController = useRef<AbortController | null>(null);
-  useEffect(() => () => {
-    mounted.current = false; submitController.current?.abort();
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false; submitController.current?.abort();
+    };
   }, []);
   useEffect(() => {
     if (!editing) return;
@@ -109,10 +136,13 @@ function VehicleForm({ editing = false }: { editing?: boolean }) {
   if (!user || (editing ? !canEdit(user.role) : user.role !== "SUPER_ADMIN")) return <Redirect to="/vehicles" />;
   if (editing && !vehicle && !error) return <p>Loading vehicle…</p>;
   const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setError(""); setFieldErrors({}); const data = new FormData(event.currentTarget); const payload: Record<string, unknown> = {};
+    event.preventDefault();
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
+    setError(""); setFieldErrors({}); const data = new FormData(event.currentTarget); const payload: Record<string, unknown> = {};
     for (const key of ["device_id","plate_number","display_name","vehicle_type","manufacturer","model"]) if (!editing || key !== "device_id") payload[key] = String(data.get(key) ?? "");
     for (const key of ["model_year","passenger_capacity"]) { const value = String(data.get(key) ?? ""); payload[key] = value ? Number(value) : null; }
-    submitController.current?.abort();
+    setBusy(true);
     const controller = new AbortController(); submitController.current = controller;
     try {
       const saved = editing
@@ -133,10 +163,14 @@ function VehicleForm({ editing = false }: { editing?: boolean }) {
         setError("Unable to save vehicle.");
       }
     } finally {
-      if (submitController.current === controller) submitController.current = null;
+      if (submitController.current === controller) {
+        submitController.current = null;
+        submitInFlight.current = false;
+        if (mounted.current) setBusy(false);
+      }
     }
   };
-  return <><h1>{editing ? "Edit vehicle" : "Create vehicle"}</h1><form className="vehicle-form" onSubmit={submit}>
+  return <><h1>{editing ? "Edit vehicle" : "Create vehicle"}</h1><form key={editing ? deviceId : "create"} className="vehicle-form" onSubmit={submit}>
     <label>Device ID<input name="device_id" required={!editing} disabled={editing} defaultValue={vehicle?.device_id} pattern="[A-Z0-9][A-Z0-9._-]{0,63}" aria-describedby="device_id-error" />{fieldErrors.device_id && <span id="device_id-error" role="alert">{fieldErrors.device_id}</span>}</label>
     <label>Plate number<input name="plate_number" required defaultValue={vehicle?.plate_number} aria-describedby="plate_number-error" />{fieldErrors.plate_number && <span id="plate_number-error" role="alert">{fieldErrors.plate_number}</span>}</label>
     <label>Display name<input name="display_name" required defaultValue={vehicle?.display_name} aria-describedby="display_name-error" />{fieldErrors.display_name && <span id="display_name-error" role="alert">{fieldErrors.display_name}</span>}</label>
@@ -145,7 +179,7 @@ function VehicleForm({ editing = false }: { editing?: boolean }) {
     <label>Model<input name="model" defaultValue={vehicle?.model} aria-describedby="model-error" />{fieldErrors.model && <span id="model-error" role="alert">{fieldErrors.model}</span>}</label>
     <label>Model year<input name="model_year" type="number" min="1980" max={new Date().getUTCFullYear() + 1} defaultValue={vehicle?.model_year ?? ""} aria-describedby="model_year-error" />{fieldErrors.model_year && <span id="model_year-error" role="alert">{fieldErrors.model_year}</span>}</label>
     <label>Passenger capacity<input name="passenger_capacity" type="number" min="1" max="100" defaultValue={vehicle?.passenger_capacity ?? ""} aria-describedby="passenger_capacity-error" />{fieldErrors.passenger_capacity && <span id="passenger_capacity-error" role="alert">{fieldErrors.passenger_capacity}</span>}</label>
-    {error && <p role="alert" className="message message--error">{error}</p>}<button>Save vehicle</button>
+    {error && <p role="alert" className="message message--error">{error}</p>}<button disabled={busy}>{busy ? "Saving…" : "Save vehicle"}</button>
   </form></>;
 }
 function LiveStatus({ deviceId }: { deviceId: string }) {
@@ -166,13 +200,17 @@ function VehicleDetail() {
   const { deviceId = "" } = useParams<{ deviceId: string }>(); const { user } = useAuth(); const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [state, setState] = useState<"loading"|"error"|"missing">("loading");
   const [actionError, setActionError] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
   const mounted = useRef(true);
+  const actionInFlight = useRef(false);
   const actionController = useRef<AbortController | null>(null);
-  useEffect(() => () => {
-    mounted.current = false; actionController.current?.abort();
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false; actionController.current?.abort();
+    };
   }, []);
   useEffect(() => {
-    actionController.current?.abort(); actionController.current = null;
     let active = true; const controller = new AbortController();
     getVehicle(deviceId, controller.signal)
       .then((loaded) => { if (active) setVehicle(loaded); })
@@ -185,10 +223,12 @@ function VehicleDetail() {
   }, [deviceId]);
   if (!vehicle || vehicle.device_id !== deviceId) return <p role={state === "error" ? "alert" : undefined}>{state === "loading" ? "Loading vehicle…" : state === "missing" ? "Vehicle not found." : "Unable to load vehicle."}</p>;
   const toggle = async () => {
+    if (actionInFlight.current) return;
     const action = vehicle.is_active ? "deactivate" : "reactivate";
     if (!window.confirm(`Confirm ${action} ${vehicle.device_id}?`)) return;
+    actionInFlight.current = true;
+    setActionBusy(true);
     setActionError("");
-    actionController.current?.abort();
     const controller = new AbortController(); actionController.current = controller;
     try {
       const updated = await changeVehicleStatus(
@@ -201,21 +241,33 @@ function VehicleDetail() {
         !(error instanceof DOMException && error.name === "AbortError")
       ) setActionError(`Unable to ${action} this vehicle.`);
     } finally {
-      if (actionController.current === controller) actionController.current = null;
+      if (actionController.current === controller) {
+        actionController.current = null;
+        actionInFlight.current = false;
+        if (mounted.current) setActionBusy(false);
+      }
     }
   };
   return <><div className="page-title"><div><p className="eyebrow">{vehicle.device_id}</p><h1>{vehicle.display_name}</h1></div>
-    {user && canEdit(user.role) && <Link className="button" to="edit">Edit</Link>}{user?.role === "SUPER_ADMIN" && <button onClick={() => void toggle()}>{vehicle.is_active ? "Deactivate" : "Reactivate"}</button>}</div>
+    {user && canEdit(user.role) && <Link className="button" to="edit">Edit</Link>}{user?.role === "SUPER_ADMIN" && <button disabled={actionBusy} onClick={() => void toggle()}>{actionBusy ? "Updating…" : vehicle.is_active ? "Deactivate" : "Reactivate"}</button>}</div>
     {actionError && <p role="alert" className="message message--error">{actionError}</p>}<dl className="registry-grid">{Object.entries(vehicle).map(([key, value]) => <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{value === null || value === "" ? "Unavailable" : String(value)}</dd></div>)}</dl>
     <LiveStatus deviceId={vehicle.device_id} /></>;
+}
+function VehicleEditRoute() {
+  const { deviceId = "" } = useParams<{ deviceId: string }>();
+  return <VehicleForm key={deviceId} editing />;
+}
+function VehicleDetailRoute() {
+  const { deviceId = "" } = useParams<{ deviceId: string }>();
+  return <VehicleDetail key={deviceId} />;
 }
 export default function App() {
   const secure = (page: React.ReactNode) => <Protected><Shell>{page}</Shell></Protected>;
   return <Switch>
     <Route path="/login" exact><LoginPage /></Route>
     <Route path="/vehicles/new" exact>{secure(<VehicleForm />)}</Route>
-    <Route path="/vehicles/:deviceId/edit" exact>{secure(<VehicleForm editing />)}</Route>
-    <Route path="/vehicles/:deviceId" exact>{secure(<VehicleDetail />)}</Route>
+    <Route path="/vehicles/:deviceId/edit" exact>{secure(<VehicleEditRoute />)}</Route>
+    <Route path="/vehicles/:deviceId" exact>{secure(<VehicleDetailRoute />)}</Route>
     <Route path="/vehicles" exact>{secure(<VehicleList />)}</Route>
     <Redirect to="/vehicles" />
   </Switch>;

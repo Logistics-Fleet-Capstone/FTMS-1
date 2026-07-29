@@ -15,6 +15,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const mounted = useRef(true);
   const actionControllers = useRef(new Set<AbortController>());
+  const signInInFlight = useRef(false);
+  const signOutInFlight = useRef(false);
   useEffect(() => {
     mounted.current = true;
     const controller = new AbortController();
@@ -43,18 +45,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthState>(() => ({
     user, loading,
     signIn: async (username, password) => {
+      if (signInInFlight.current) return;
+      signInInFlight.current = true;
       const controller = new AbortController(); actionControllers.current.add(controller);
       try {
         const signedIn = await auth.login(username, password, controller.signal);
         if (mounted.current) setUser(signedIn);
-      } finally { actionControllers.current.delete(controller); }
+      } finally {
+        actionControllers.current.delete(controller);
+        signInInFlight.current = false;
+      }
     },
     signOut: async () => {
+      if (signOutInFlight.current) return;
+      signOutInFlight.current = true;
       const controller = new AbortController(); actionControllers.current.add(controller);
       try {
         await auth.logout(controller.signal);
         if (mounted.current) setUser(null);
-      } finally { actionControllers.current.delete(controller); }
+      } finally {
+        actionControllers.current.delete(controller);
+        signOutInFlight.current = false;
+      }
     },
     expire: () => { if (mounted.current) setUser(null); },
   }), [user, loading]);
