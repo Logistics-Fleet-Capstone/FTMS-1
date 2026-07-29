@@ -39,16 +39,18 @@ Services:
 
 ## Verification commands
 
-Backend:
+Backend verification inside the running Compose stack:
 
 ```bash
-cd backend
-python -m pip install -r requirements.txt
-ruff check .
-python manage.py check
-python manage.py makemigrations --check --dry-run
-python manage.py test
+docker compose exec backend ruff check .
+docker compose exec backend python manage.py check
+docker compose exec backend python manage.py makemigrations --check --dry-run
+docker compose exec backend python manage.py test
 ```
+
+These tests use the PostgreSQL/PostGIS service on the internal Compose network. Optional
+host-based backend commands require Python dependencies plus a separately reachable
+PostgreSQL/PostGIS instance and a matching host-accessible `DATABASE_URL`.
 
 Frontend:
 
