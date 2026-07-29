@@ -6,9 +6,11 @@ from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
+from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import Point
 from django.test import TransactionTestCase, override_settings
 
+from accounts.models import StaffProfile
 from fleet.models import Vehicle
 from telemetry.consumers import VehicleStatusConsumer
 from telemetry.models import TelemetryEvent
@@ -23,12 +25,22 @@ CHANNEL_LAYERS = {
 
 @override_settings(CHANNEL_LAYERS=CHANNEL_LAYERS)
 class VehicleStatusWebSocketTests(TransactionTestCase):
+    async def communicator(self, path):
+        communicator = WebsocketCommunicator(URLRouter(websocket_urlpatterns), path)
+        communicator.scope["user"] = await self.create_user()
+        return communicator
+
+    async def test_anonymous_closes_with_4401(self):
+        communicator = WebsocketCommunicator(
+            URLRouter(websocket_urlpatterns), "/ws/v1/vehicles/LILYGO-001/status/"
+        )
+        connected, close_code = await communicator.connect()
+        self.assertFalse(connected)
+        self.assertEqual(close_code, 4401)
+
     async def test_known_vehicle_receives_null_snapshot(self):
         await self.create_vehicle()
-        communicator = WebsocketCommunicator(
-            URLRouter(websocket_urlpatterns),
-            "/ws/v1/vehicles/LILYGO-001/status/",
-        )
+        communicator = await self.communicator("/ws/v1/vehicles/LILYGO-001/status/")
 
         connected, _ = await communicator.connect()
         message = await communicator.receive_json_from()
@@ -43,10 +55,7 @@ class VehicleStatusWebSocketTests(TransactionTestCase):
         vehicle = await self.create_vehicle()
         event = await self.create_event(vehicle)
         expected = await database_sync_to_async(latest_status_data)(vehicle)
-        communicator = WebsocketCommunicator(
-            URLRouter(websocket_urlpatterns),
-            "/ws/v1/vehicles/LILYGO-001/status/",
-        )
+        communicator = await self.communicator("/ws/v1/vehicles/LILYGO-001/status/")
         connected, _ = await communicator.connect()
         await communicator.receive_json_from()
 
@@ -63,10 +72,7 @@ class VehicleStatusWebSocketTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_unknown_vehicle_closes_with_4404(self):
-        communicator = WebsocketCommunicator(
-            URLRouter(websocket_urlpatterns),
-            "/ws/v1/vehicles/UNKNOWN/status/",
-        )
+        communicator = await self.communicator("/ws/v1/vehicles/UNKNOWN/status/")
 
         connected, close_code = await communicator.connect()
 
@@ -98,10 +104,7 @@ class VehicleStatusWebSocketTests(TransactionTestCase):
             )
             return snapshot
 
-        communicator = WebsocketCommunicator(
-            URLRouter(websocket_urlpatterns),
-            "/ws/v1/vehicles/LILYGO-001/status/",
-        )
+        communicator = await self.communicator("/ws/v1/vehicles/LILYGO-001/status/")
         with patch.object(
             VehicleStatusConsumer, "_snapshot", new=snapshot_with_concurrent_update
         ):
@@ -125,6 +128,15 @@ class VehicleStatusWebSocketTests(TransactionTestCase):
             plate_number="DEMO-001",
             display_name="Sprint 1 Demo Vehicle",
         )
+
+    @database_sync_to_async
+    def create_user(self):
+        user = get_user_model().objects.create_user(
+            username=f"dispatcher-{get_user_model().objects.count()}",
+            password="Strong-test-password-42!", is_staff=True,
+        )
+        StaffProfile.objects.create(user=user, role=StaffProfile.Role.DISPATCHER)
+        return user
 
     @database_sync_to_async
     def create_event(self, vehicle, **overrides):

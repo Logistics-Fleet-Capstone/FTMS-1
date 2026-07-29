@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -21,6 +22,8 @@ def accepted_response(event, *, response_status, duplicate, http_status):
 
 class TelemetryEventCreateView(APIView):
     http_method_names = ["post", "options"]
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     def post(self, request):
         try:
@@ -49,6 +52,7 @@ class TelemetryEventCreateView(APIView):
 
 class LatestVehicleStatusView(APIView):
     http_method_names = ["get", "options"]
+
 
     def get(self, request, device_id):
         vehicle = get_object_or_404(Vehicle, device_id=device_id)
