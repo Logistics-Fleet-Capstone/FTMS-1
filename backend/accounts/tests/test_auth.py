@@ -49,6 +49,27 @@ class AuthenticationTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_login_rejects_non_object_missing_null_and_non_string_fields(self):
+        token = self.token()
+        invalid_payloads = [
+            [], None, {}, {"username": None, "password": self.password},
+            {"username": 1, "password": self.password},
+            {"username": True, "password": self.password},
+            {"username": {}, "password": self.password},
+            {"username": [], "password": self.password},
+            {"username": "manager", "password": 1},
+            {"username": "manager", "password": False},
+            {"username": "manager", "password": None},
+        ]
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload):
+                cache.clear()
+                response = self.client.post(
+                    "/api/v1/auth/login/", payload,
+                    format="json", HTTP_X_CSRFTOKEN=token,
+                )
+                self.assertEqual(response.status_code, 400)
+
     def test_generic_denial_for_unauthorized_accounts(self):
         token = self.token()
         for username, kwargs in [

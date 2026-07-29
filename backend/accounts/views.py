@@ -29,6 +29,11 @@ class LoginView(APIView):
     throttle_classes = [LoginThrottle]
 
     def post(self, request):
+        if not isinstance(request.data, dict):
+            return Response(
+                {"non_field_errors": ["Expected a JSON object."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = authenticate(

@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.permissions import StaffAccess
 from fleet.models import Vehicle
 from telemetry.presentation import event_data, latest_status_data
 from telemetry.services import IngestionStatus, TelemetryValidationError, ingest_telemetry
@@ -52,7 +53,7 @@ class TelemetryEventCreateView(APIView):
 
 class LatestVehicleStatusView(APIView):
     http_method_names = ["get", "options"]
-
+    permission_classes = [StaffAccess]
 
     def get(self, request, device_id):
         vehicle = get_object_or_404(Vehicle, device_id=device_id)

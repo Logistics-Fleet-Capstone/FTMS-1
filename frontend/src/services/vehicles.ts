@@ -15,9 +15,9 @@ export const getVehicles = (query: string, signal?: AbortSignal) =>
   api<VehiclePage>(`/api/v1/vehicles/${query ? `?${query}` : ""}`, { signal });
 export const getVehicle = (id: string, signal?: AbortSignal) =>
   api<Vehicle>(`/api/v1/vehicles/${encodeURIComponent(id)}/`, { signal });
-export const createVehicle = (body: unknown) =>
-  api<Vehicle>("/api/v1/vehicles/", { method: "POST", body: JSON.stringify(body) });
-export const editVehicle = (id: string, body: unknown) =>
-  api<Vehicle>(`/api/v1/vehicles/${encodeURIComponent(id)}/`, { method: "PATCH", body: JSON.stringify(body) });
-export const changeVehicleStatus = (id: string, active: boolean) =>
-  api<Vehicle>(`/api/v1/vehicles/${encodeURIComponent(id)}/${active ? "reactivate" : "deactivate"}/`, { method: "POST", body: "{}" });
+export const createVehicle = (body: unknown, signal?: AbortSignal) =>
+  api<Vehicle>("/api/v1/vehicles/", { method: "POST", body: JSON.stringify(body), signal });
+export const editVehicle = (id: string, body: unknown, signal?: AbortSignal) =>
+  api<Vehicle>(`/api/v1/vehicles/${encodeURIComponent(id)}/`, { method: "PATCH", body: JSON.stringify(body), signal });
+export const changeVehicleStatus = (id: string, active: boolean, signal?: AbortSignal) =>
+  api<Vehicle>(`/api/v1/vehicles/${encodeURIComponent(id)}/${active ? "reactivate" : "deactivate"}/`, { method: "POST", body: "{}", signal });

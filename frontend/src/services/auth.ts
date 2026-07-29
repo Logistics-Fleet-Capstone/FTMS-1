@@ -9,10 +9,10 @@ export async function bootstrapCsrf(signal?: AbortSignal) {
   const result = await api<{ csrf_token: string }>("/api/v1/auth/csrf/", { signal });
   setCsrfToken(result.csrf_token);
 }
-export async function login(username: string, password: string) {
-  await bootstrapCsrf();
+export async function login(username: string, password: string, signal?: AbortSignal) {
+  await bootstrapCsrf(signal);
   const result = await api<{ user: StaffUser; csrf_token: string }>(
-    "/api/v1/auth/login/", { method: "POST", body: JSON.stringify({ username, password }) },
+    "/api/v1/auth/login/", { method: "POST", body: JSON.stringify({ username, password }), signal },
   );
   setCsrfToken(result.csrf_token);
   return result.user;
@@ -20,7 +20,7 @@ export async function login(username: string, password: string) {
 export async function me(signal?: AbortSignal) {
   return (await api<{ user: StaffUser }>("/api/v1/auth/me/", { signal })).user;
 }
-export async function logout() {
-  await api<null>("/api/v1/auth/logout/", { method: "POST" });
+export async function logout(signal?: AbortSignal) {
+  await api<null>("/api/v1/auth/logout/", { method: "POST", signal });
   setCsrfToken("");
 }

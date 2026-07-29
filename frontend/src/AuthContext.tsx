@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "./services/api";
 import * as auth from "./services/auth";
 import type { StaffUser } from "./services/auth";
@@ -13,20 +13,50 @@ const Context = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<StaffUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const mounted = useRef(true);
+  const actionControllers = useRef(new Set<AbortController>());
   useEffect(() => {
+    mounted.current = true;
     const controller = new AbortController();
-    const expire = () => setUser(null);
+    const controllers = actionControllers.current;
+    let active = true;
+    const expire = () => { if (active) setUser(null); };
     window.addEventListener("ftms:session-expired", expire);
-    auth.bootstrapCsrf(controller.signal).then(() => auth.me(controller.signal)).then(setUser).catch((error: unknown) => {
-      if (!(error instanceof ApiError && error.status === 401)) setUser(null);
-    }).finally(() => setLoading(false));
-    return () => { controller.abort(); window.removeEventListener("ftms:session-expired", expire); };
+    auth.bootstrapCsrf(controller.signal)
+      .then(() => auth.me(controller.signal))
+      .then((restored) => { if (active) setUser(restored); })
+      .catch((error: unknown) => {
+        if (
+          active &&
+          !(error instanceof DOMException && error.name === "AbortError") &&
+          !(error instanceof ApiError && error.status === 401)
+        ) setUser(null);
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => {
+      active = false; mounted.current = false; controller.abort();
+      controllers.forEach((item) => item.abort());
+      controllers.clear();
+      window.removeEventListener("ftms:session-expired", expire);
+    };
   }, []);
   const value = useMemo<AuthState>(() => ({
     user, loading,
-    signIn: async (username, password) => setUser(await auth.login(username, password)),
-    signOut: async () => { await auth.logout(); setUser(null); },
-    expire: () => setUser(null),
+    signIn: async (username, password) => {
+      const controller = new AbortController(); actionControllers.current.add(controller);
+      try {
+        const signedIn = await auth.login(username, password, controller.signal);
+        if (mounted.current) setUser(signedIn);
+      } finally { actionControllers.current.delete(controller); }
+    },
+    signOut: async () => {
+      const controller = new AbortController(); actionControllers.current.add(controller);
+      try {
+        await auth.logout(controller.signal);
+        if (mounted.current) setUser(null);
+      } finally { actionControllers.current.delete(controller); }
+    },
+    expire: () => { if (mounted.current) setUser(null); },
   }), [user, loading]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

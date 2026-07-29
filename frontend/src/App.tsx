@@ -1,10 +1,11 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, Redirect, Route, Switch, useHistory, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import LiveVehicleMap from "./components/LiveVehicleMap";
 import { useVehicleStatus } from "./hooks/useVehicleStatus";
 import { ApiError } from "./services/api";
 import type { Role } from "./services/auth";
+import { safeInternalPath } from "./services/navigation";
 import { changeVehicleStatus, createVehicle, editVehicle, getVehicle, getVehicles, vehicleTypes, type Vehicle } from "./services/vehicles";
 import "./styles.css";
 
@@ -17,23 +18,34 @@ function Protected({ children }: { children: React.ReactNode }) {
 }
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
+  const [logoutError, setLogoutError] = useState("");
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
+  const submitLogout = async () => {
+    setLogoutError("");
+    try { await signOut(); }
+    catch { if (mounted.current) setLogoutError("Unable to sign out. Please try again."); }
+  };
   return <main><section className="shell"><header className="app-header">
     <Link to="/vehicles"><strong>FTMS Vehicle Registry</strong></Link>
     <span>{user?.display_name} · {user?.role.replaceAll("_", " ")}</span>
-    <button onClick={() => void signOut()}>Sign out</button>
-  </header>{children}</section></main>;
+    <button onClick={() => void submitLogout()}>Sign out</button>
+  </header>{logoutError && <p role="alert" className="message message--error">{logoutError}</p>}{children}</section></main>;
 }
 function LoginPage() {
   const { user, signIn } = useAuth(); const history = useHistory(); const location = useLocation();
   const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
   if (user) return <Redirect to="/vehicles" />;
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setBusy(true); setError(""); const data = new FormData(event.currentTarget);
     try {
       await signIn(String(data.get("username")), String(data.get("password")));
       const requested = (location.state as { from?: string } | null)?.from;
-      history.replace(requested?.startsWith("/") && !requested.startsWith("//") ? requested : "/vehicles");
-    } catch { setError("Unable to sign in with those credentials."); } finally { setBusy(false); }
+      history.replace(safeInternalPath(requested));
+    } catch { if (mounted.current) setError("Unable to sign in with those credentials."); }
+    finally { if (mounted.current) setBusy(false); }
   };
   return <main><section className="shell auth-card"><p className="eyebrow">Secure staff access</p><h1>Sign in to FTMS</h1>
     <form onSubmit={submit}><label>Username<input name="username" required autoComplete="username" /></label>
@@ -76,26 +88,63 @@ function VehicleList() {
 function VehicleForm({ editing = false }: { editing?: boolean }) {
   const { user } = useAuth(); const { deviceId = "" } = useParams<{ deviceId: string }>(); const history = useHistory();
   const [vehicle, setVehicle] = useState<Vehicle | null>(null); const [error, setError] = useState("");
-  useEffect(() => { if (!editing) return; const controller = new AbortController();
-    getVehicle(deviceId, controller.signal).then(setVehicle).catch(() => setError("Unable to load vehicle."));
-    return () => controller.abort(); }, [editing, deviceId]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const mounted = useRef(true);
+  const submitController = useRef<AbortController | null>(null);
+  useEffect(() => () => {
+    mounted.current = false; submitController.current?.abort();
+  }, []);
+  useEffect(() => {
+    if (!editing) return;
+    let active = true; const controller = new AbortController();
+    getVehicle(deviceId, controller.signal)
+      .then((loaded) => { if (active) setVehicle(loaded); })
+      .catch((reason: unknown) => {
+        if (active && !(reason instanceof DOMException && reason.name === "AbortError")) {
+          setError(reason instanceof ApiError && reason.status === 403 ? "You do not have permission to edit this vehicle." : reason instanceof ApiError && reason.status === 404 ? "Vehicle not found." : "Unable to load vehicle.");
+        }
+      });
+    return () => { active = false; controller.abort(); };
+  }, [editing, deviceId]);
   if (!user || (editing ? !canEdit(user.role) : user.role !== "SUPER_ADMIN")) return <Redirect to="/vehicles" />;
   if (editing && !vehicle && !error) return <p>Loading vehicle…</p>;
   const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setError(""); const data = new FormData(event.currentTarget); const payload: Record<string, unknown> = {};
+    event.preventDefault(); setError(""); setFieldErrors({}); const data = new FormData(event.currentTarget); const payload: Record<string, unknown> = {};
     for (const key of ["device_id","plate_number","display_name","vehicle_type","manufacturer","model"]) if (!editing || key !== "device_id") payload[key] = String(data.get(key) ?? "");
     for (const key of ["model_year","passenger_capacity"]) { const value = String(data.get(key) ?? ""); payload[key] = value ? Number(value) : null; }
-    try { const saved = editing ? await editVehicle(deviceId, payload) : await createVehicle(payload); history.push(`/vehicles/${encodeURIComponent(saved.device_id)}`); }
-    catch (reason) { setError(reason instanceof ApiError ? "Please correct the vehicle information." : "Unable to save vehicle."); }
+    submitController.current?.abort();
+    const controller = new AbortController(); submitController.current = controller;
+    try {
+      const saved = editing
+        ? await editVehicle(deviceId, payload, controller.signal)
+        : await createVehicle(payload, controller.signal);
+      if (mounted.current) history.push(`/vehicles/${encodeURIComponent(saved.device_id)}`);
+    }
+    catch (reason) {
+      if (!mounted.current) return;
+      if (reason instanceof ApiError && reason.body && typeof reason.body === "object") {
+        const safe = Object.fromEntries(
+          Object.entries(reason.body as Record<string, unknown>).map(([key, value]) => [
+            key, Array.isArray(value) ? String(value[0]) : String(value),
+          ]),
+        );
+        setFieldErrors(safe); setError("Please correct the vehicle information.");
+      } else if (!(reason instanceof DOMException && reason.name === "AbortError")) {
+        setError("Unable to save vehicle.");
+      }
+    } finally {
+      if (submitController.current === controller) submitController.current = null;
+    }
   };
   return <><h1>{editing ? "Edit vehicle" : "Create vehicle"}</h1><form className="vehicle-form" onSubmit={submit}>
-    <label>Device ID<input name="device_id" required={!editing} disabled={editing} defaultValue={vehicle?.device_id} pattern="[A-Z0-9][A-Z0-9._-]{0,63}" /></label>
-    <label>Plate number<input name="plate_number" required defaultValue={vehicle?.plate_number} /></label>
-    <label>Display name<input name="display_name" required defaultValue={vehicle?.display_name} /></label>
-    <label>Vehicle type<select name="vehicle_type" defaultValue={vehicle?.vehicle_type ?? "OTHER"}>{vehicleTypes.map(v => <option key={v}>{v}</option>)}</select></label>
-    <label>Manufacturer<input name="manufacturer" defaultValue={vehicle?.manufacturer} /></label><label>Model<input name="model" defaultValue={vehicle?.model} /></label>
-    <label>Model year<input name="model_year" type="number" min="1980" max={new Date().getUTCFullYear() + 1} defaultValue={vehicle?.model_year ?? ""} /></label>
-    <label>Passenger capacity<input name="passenger_capacity" type="number" min="1" max="100" defaultValue={vehicle?.passenger_capacity ?? ""} /></label>
+    <label>Device ID<input name="device_id" required={!editing} disabled={editing} defaultValue={vehicle?.device_id} pattern="[A-Z0-9][A-Z0-9._-]{0,63}" aria-describedby="device_id-error" />{fieldErrors.device_id && <span id="device_id-error" role="alert">{fieldErrors.device_id}</span>}</label>
+    <label>Plate number<input name="plate_number" required defaultValue={vehicle?.plate_number} aria-describedby="plate_number-error" />{fieldErrors.plate_number && <span id="plate_number-error" role="alert">{fieldErrors.plate_number}</span>}</label>
+    <label>Display name<input name="display_name" required defaultValue={vehicle?.display_name} aria-describedby="display_name-error" />{fieldErrors.display_name && <span id="display_name-error" role="alert">{fieldErrors.display_name}</span>}</label>
+    <label>Vehicle type<select name="vehicle_type" defaultValue={vehicle?.vehicle_type ?? "OTHER"} aria-describedby="vehicle_type-error">{vehicleTypes.map(v => <option key={v}>{v}</option>)}</select>{fieldErrors.vehicle_type && <span id="vehicle_type-error" role="alert">{fieldErrors.vehicle_type}</span>}</label>
+    <label>Manufacturer<input name="manufacturer" defaultValue={vehicle?.manufacturer} aria-describedby="manufacturer-error" />{fieldErrors.manufacturer && <span id="manufacturer-error" role="alert">{fieldErrors.manufacturer}</span>}</label>
+    <label>Model<input name="model" defaultValue={vehicle?.model} aria-describedby="model-error" />{fieldErrors.model && <span id="model-error" role="alert">{fieldErrors.model}</span>}</label>
+    <label>Model year<input name="model_year" type="number" min="1980" max={new Date().getUTCFullYear() + 1} defaultValue={vehicle?.model_year ?? ""} aria-describedby="model_year-error" />{fieldErrors.model_year && <span id="model_year-error" role="alert">{fieldErrors.model_year}</span>}</label>
+    <label>Passenger capacity<input name="passenger_capacity" type="number" min="1" max="100" defaultValue={vehicle?.passenger_capacity ?? ""} aria-describedby="passenger_capacity-error" />{fieldErrors.passenger_capacity && <span id="passenger_capacity-error" role="alert">{fieldErrors.passenger_capacity}</span>}</label>
     {error && <p role="alert" className="message message--error">{error}</p>}<button>Save vehicle</button>
   </form></>;
 }
@@ -116,12 +165,48 @@ function LiveStatus({ deviceId }: { deviceId: string }) {
 function VehicleDetail() {
   const { deviceId = "" } = useParams<{ deviceId: string }>(); const { user } = useAuth(); const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [state, setState] = useState<"loading"|"error"|"missing">("loading");
-  useEffect(() => { const controller = new AbortController(); getVehicle(deviceId, controller.signal).then(setVehicle).catch((e: unknown) => setState(e instanceof ApiError && e.status === 404 ? "missing" : "error")); return () => controller.abort(); }, [deviceId]);
-  if (!vehicle) return <p role={state === "error" ? "alert" : undefined}>{state === "loading" ? "Loading vehicle…" : state === "missing" ? "Vehicle not found." : "Unable to load vehicle."}</p>;
-  const toggle = async () => { const action = vehicle.is_active ? "deactivate" : "reactivate"; if (window.confirm(`Confirm ${action} ${vehicle.device_id}?`)) setVehicle(await changeVehicleStatus(vehicle.device_id, !vehicle.is_active)); };
+  const [actionError, setActionError] = useState("");
+  const mounted = useRef(true);
+  const actionController = useRef<AbortController | null>(null);
+  useEffect(() => () => {
+    mounted.current = false; actionController.current?.abort();
+  }, []);
+  useEffect(() => {
+    actionController.current?.abort(); actionController.current = null;
+    let active = true; const controller = new AbortController();
+    getVehicle(deviceId, controller.signal)
+      .then((loaded) => { if (active) setVehicle(loaded); })
+      .catch((error: unknown) => {
+        if (active && !(error instanceof DOMException && error.name === "AbortError")) {
+          setState(error instanceof ApiError && error.status === 404 ? "missing" : "error");
+        }
+      });
+    return () => { active = false; controller.abort(); };
+  }, [deviceId]);
+  if (!vehicle || vehicle.device_id !== deviceId) return <p role={state === "error" ? "alert" : undefined}>{state === "loading" ? "Loading vehicle…" : state === "missing" ? "Vehicle not found." : "Unable to load vehicle."}</p>;
+  const toggle = async () => {
+    const action = vehicle.is_active ? "deactivate" : "reactivate";
+    if (!window.confirm(`Confirm ${action} ${vehicle.device_id}?`)) return;
+    setActionError("");
+    actionController.current?.abort();
+    const controller = new AbortController(); actionController.current = controller;
+    try {
+      const updated = await changeVehicleStatus(
+        vehicle.device_id, !vehicle.is_active, controller.signal,
+      );
+      if (mounted.current) setVehicle(updated);
+    } catch (error) {
+      if (
+        mounted.current &&
+        !(error instanceof DOMException && error.name === "AbortError")
+      ) setActionError(`Unable to ${action} this vehicle.`);
+    } finally {
+      if (actionController.current === controller) actionController.current = null;
+    }
+  };
   return <><div className="page-title"><div><p className="eyebrow">{vehicle.device_id}</p><h1>{vehicle.display_name}</h1></div>
     {user && canEdit(user.role) && <Link className="button" to="edit">Edit</Link>}{user?.role === "SUPER_ADMIN" && <button onClick={() => void toggle()}>{vehicle.is_active ? "Deactivate" : "Reactivate"}</button>}</div>
-    <dl className="registry-grid">{Object.entries(vehicle).map(([key, value]) => <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{value === null || value === "" ? "Unavailable" : String(value)}</dd></div>)}</dl>
+    {actionError && <p role="alert" className="message message--error">{actionError}</p>}<dl className="registry-grid">{Object.entries(vehicle).map(([key, value]) => <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{value === null || value === "" ? "Unavailable" : String(value)}</dd></div>)}</dl>
     <LiveStatus deviceId={vehicle.device_id} /></>;
 }
 export default function App() {

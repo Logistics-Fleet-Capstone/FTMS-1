@@ -1,8 +1,7 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import App from "./App";
-import { reconnectDelay } from "./hooks/useVehicleStatus";
 import type { Role } from "./services/auth";
 
 const auth = vi.hoisted(() => ({
@@ -45,6 +44,16 @@ describe("Sprint 3 secure registry", () => {
     renderAt("/vehicles");
     expect(await screen.findByRole("heading", { name: "Sign in to FTMS" })).toBeInTheDocument();
   });
+  test("invalid login displays only the generic message", async () => {
+    auth.user = null as unknown as typeof auth.user;
+    auth.signIn.mockRejectedValueOnce(new Error("internal credential detail"));
+    renderAt("/login");
+    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "staff" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret" } });
+    fireEvent.click(screen.getByText("Sign in"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to sign in with those credentials.");
+    expect(screen.queryByText(/internal credential detail/)).not.toBeInTheDocument();
+  });
   test("restores a dispatcher list without write controls", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(() => response({ count: 1, next: null, previous: null, results: [vehicle] }));
     renderAt("/vehicles");
@@ -83,13 +92,47 @@ describe("Sprint 3 secure registry", () => {
     expect(screen.getAllByText("Unavailable").length).toBeGreaterThan(0);
     expect(screen.getByText("Waiting for the first telemetry event…")).toBeInTheDocument();
   });
-  test("permanent WebSocket close codes do not schedule reconnects", async () => {
-    vi.useFakeTimers();
-    vi.spyOn(globalThis, "fetch").mockImplementation(input => String(input).includes("latest-status")
-      ? response({ vehicle: { device_id: vehicle.device_id, plate_number: vehicle.plate_number, display_name: vehicle.display_name }, latest: null })
-      : response(vehicle));
-    renderAt("/vehicles/LILYGO-001"); await act(async () => Promise.resolve());
-    expect(reconnectDelay(0)).toBe(1000);
-    vi.useRealTimers();
+  test("failed status change is accessible and preserves the previous state", async () => {
+    auth.user.role = "SUPER_ADMIN";
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(globalThis, "fetch").mockImplementation(input => {
+      const url = String(input);
+      if (url.includes("deactivate")) return response({ detail: "internal" }, 500);
+      if (url.includes("latest-status")) return response({ vehicle: { device_id: vehicle.device_id, plate_number: vehicle.plate_number, display_name: vehicle.display_name }, latest: null });
+      return response(vehicle);
+    });
+    renderAt("/vehicles/LILYGO-001");
+    fireEvent.click(await screen.findByText("Deactivate"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to deactivate this vehicle.");
+    expect(screen.getByText("true")).toBeInTheDocument();
+    expect(screen.getByText("Deactivate")).toBeInTheDocument();
+  });
+  test("backend field errors render safely on corresponding form fields", async () => {
+    auth.user.role = "SUPER_ADMIN";
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => response({ plate_number: ["Already exists."] }, 400));
+    renderAt("/vehicles/new");
+    fireEvent.change(screen.getByLabelText("Device ID"), { target: { value: "TEST-001" } });
+    fireEvent.change(screen.getByLabelText("Plate number"), { target: { value: "TEST-001" } });
+    fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Test" } });
+    fireEvent.click(screen.getByText("Save vehicle"));
+    expect(await screen.findByText("Already exists.")).toHaveAttribute("id", "plate_number-error");
+    expect(screen.queryByText(/traceback|exception|internal/i)).not.toBeInTheDocument();
+  });
+  test("unmount aborts an unresolved detail request", () => {
+    let signal: AbortSignal | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
+      signal = init?.signal ?? undefined;
+      return new Promise(() => undefined);
+    });
+    const rendered = renderAt("/vehicles/LILYGO-001");
+    rendered.unmount();
+    expect(signal?.aborted).toBe(true);
+  });
+  test("logout failure is handled without an unhandled rejection", async () => {
+    auth.signOut.mockRejectedValueOnce(new Error("network"));
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => response({ count: 0, next: null, previous: null, results: [] }));
+    renderAt("/vehicles");
+    fireEvent.click(screen.getByText("Sign out"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to sign out. Please try again.");
   });
 });

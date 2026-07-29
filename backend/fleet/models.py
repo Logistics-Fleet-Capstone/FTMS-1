@@ -43,9 +43,8 @@ class Vehicle(models.Model):
             ),
             models.UniqueConstraint(Lower("plate_number"), name="fleet_vehicle_plate_ci_unique"),
             models.CheckConstraint(
-                condition=models.Q(model_year__isnull=True)
-                | models.Q(model_year__range=(1980, 2027)),
-                name="fleet_vehicle_model_year_range",
+                condition=models.Q(model_year__isnull=True) | models.Q(model_year__gte=1980),
+                name="fleet_vehicle_model_year_min",
             ),
             models.CheckConstraint(
                 condition=models.Q(passenger_capacity__isnull=True)

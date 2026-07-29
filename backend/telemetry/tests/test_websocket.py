@@ -38,6 +38,18 @@ class VehicleStatusWebSocketTests(TransactionTestCase):
         self.assertFalse(connected)
         self.assertEqual(close_code, 4401)
 
+    async def test_authenticated_profileless_user_closes_with_4403_before_lookup(self):
+        user = await self.create_profileless_user()
+        for device_id in ("LILYGO-001", "UNKNOWN"):
+            communicator = WebsocketCommunicator(
+                URLRouter(websocket_urlpatterns),
+                f"/ws/v1/vehicles/{device_id}/status/",
+            )
+            communicator.scope["user"] = user
+            connected, close_code = await communicator.connect()
+            self.assertFalse(connected)
+            self.assertEqual(close_code, 4403)
+
     async def test_known_vehicle_receives_null_snapshot(self):
         await self.create_vehicle()
         communicator = await self.communicator("/ws/v1/vehicles/LILYGO-001/status/")
@@ -137,6 +149,12 @@ class VehicleStatusWebSocketTests(TransactionTestCase):
         )
         StaffProfile.objects.create(user=user, role=StaffProfile.Role.DISPATCHER)
         return user
+
+    @database_sync_to_async
+    def create_profileless_user(self):
+        return get_user_model().objects.create_user(
+            username="profileless", password="Strong-test-password-42!", is_staff=True
+        )
 
     @database_sync_to_async
     def create_event(self, vehicle, **overrides):

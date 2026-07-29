@@ -8,12 +8,13 @@ from .models import Vehicle
 
 class StrictFieldsMixin:
     def to_internal_value(self, data):
-        if hasattr(data, "keys"):
-            unknown = set(data.keys()) - set(self.fields)
-            if unknown:
-                raise serializers.ValidationError({
-                    field: ["Unknown field."] for field in sorted(unknown)
-                })
+        if not isinstance(data, dict):
+            raise serializers.ValidationError("Expected a JSON object.")
+        unknown = set(data.keys()) - set(self.fields)
+        if unknown:
+            raise serializers.ValidationError({
+                field: ["Unknown field."] for field in sorted(unknown)
+            })
         return super().to_internal_value(data)
 
 
@@ -52,14 +53,30 @@ class VehicleSerializer(StrictFieldsMixin, serializers.ModelSerializer):
         for field in ("display_name", "manufacturer", "model"):
             if field in attrs:
                 attrs[field] = attrs[field].strip()
+        errors = {}
+        for field in ("created_at", "updated_at"):
+            if field in self.initial_data:
+                errors[field] = "This field is not accepted."
+        string_fields = (
+            "device_id", "plate_number", "display_name", "vehicle_type",
+            "manufacturer", "model",
+        )
+        for field in string_fields:
+            if field in self.initial_data and not isinstance(self.initial_data[field], str):
+                errors[field] = "Must be a string."
+        for field in ("model_year", "passenger_capacity"):
+            value = self.initial_data.get(field)
+            if field in self.initial_data and value is not None and (
+                not isinstance(value, int) or isinstance(value, bool)
+            ):
+                errors[field] = "Must be an integer or null."
         if self.instance is None and "is_active" in self.initial_data:
-            raise serializers.ValidationError({"is_active": "This field is not accepted."})
+            errors["is_active"] = "This field is not accepted."
         if self.instance is not None:
-            errors = {}
             if "device_id" in self.initial_data:
                 errors["device_id"] = "This field is immutable."
             if "is_active" in self.initial_data:
                 errors["is_active"] = "Use the status action."
-            if errors:
-                raise serializers.ValidationError(errors)
+        if errors:
+            raise serializers.ValidationError(errors)
         return attrs
