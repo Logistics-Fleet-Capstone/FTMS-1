@@ -9,21 +9,34 @@ from telemetry.realtime import vehicle_status_group
 class VehicleStatusConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         device_id = self.scope["url_route"]["kwargs"]["device_id"]
-        snapshot = await self._snapshot(device_id)
-        if snapshot is None:
-            await self.close(code=4404)
-            return
-
         self.group_name = vehicle_status_group(device_id)
-        await self.channel_layer.group_add(self.group_name, self.channel_name)
-        await self.accept()
-        await self.send_json(
-            {"type": "vehicle.status.snapshot", "data": snapshot}
-        )
+        self.group_joined = False
+        try:
+            await self.channel_layer.group_add(self.group_name, self.channel_name)
+            self.group_joined = True
+            snapshot = await self._snapshot(device_id)
+            if snapshot is None:
+                await self.channel_layer.group_discard(
+                    self.group_name, self.channel_name
+                )
+                self.group_joined = False
+                await self.close(code=4404)
+                return
+
+            await self.accept()
+            await self.send_json({"type": "vehicle.status.snapshot", "data": snapshot})
+        except Exception:
+            if self.group_joined:
+                await self.channel_layer.group_discard(
+                    self.group_name, self.channel_name
+                )
+                self.group_joined = False
+            raise
 
     async def disconnect(self, close_code):
-        if hasattr(self, "group_name"):
+        if getattr(self, "group_joined", False):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
+            self.group_joined = False
 
     async def vehicle_status(self, event):
         await self.send_json(event["message"])

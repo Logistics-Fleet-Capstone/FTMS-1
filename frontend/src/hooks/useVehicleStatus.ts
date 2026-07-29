@@ -56,7 +56,8 @@ export function useVehicleStatus(deviceId: string) {
       const controller = new AbortController();
       controllers.add(controller);
       try {
-        applyStatus(await getLatestStatus(deviceId, controller.signal));
+        const incoming = await getLatestStatus(deviceId, controller.signal);
+        if (active) applyStatus(incoming);
       } catch (error: unknown) {
         if (
           active &&
@@ -76,41 +77,66 @@ export function useVehicleStatus(deviceId: string) {
       }
     };
 
+    const stopFallback = () => {
+      stopPolling();
+      controllers.forEach((controller) => controller.abort());
+      controllers.clear();
+    };
+
     const startFallback = () => {
       if (pollId !== null) return;
       void fetchStatus();
       pollId = window.setInterval(() => void fetchStatus(), 5_000);
     };
 
+    const scheduleReconnect = () => {
+      if (!active || reconnectId !== null) return;
+      setRealtimeState("reconnecting");
+      startFallback();
+      const delay = reconnectDelay(reconnectAttempt);
+      reconnectAttempt += 1;
+      reconnectId = window.setTimeout(() => {
+        reconnectId = null;
+        connect();
+      }, delay);
+    };
+
     const connect = () => {
-      if (!active) return;
+      if (!active || socket !== null) return;
+      let candidate: WebSocket;
       try {
-        socket = new WebSocket(vehicleStatusWebSocketUrl(deviceId));
+        candidate = new WebSocket(vehicleStatusWebSocketUrl(deviceId));
       } catch {
         setRealtimeState("disconnected");
-        startFallback();
-        const delay = reconnectDelay(reconnectAttempt);
-        reconnectAttempt += 1;
-        reconnectId = window.setTimeout(connect, delay);
+        scheduleReconnect();
         return;
       }
-      socket.onopen = () => {
+      socket = candidate;
+      candidate.onopen = () => {
+        if (!active || socket !== candidate) return;
+        setRealtimeState(reconnectAttempt === 0 ? "connecting" : "reconnecting");
+      };
+      candidate.onmessage = (event) => {
+        if (!active || socket !== candidate) return;
+        const message = parseVehicleStatusMessage(String(event.data), deviceId);
+        if (!message) return;
         reconnectAttempt = 0;
-        stopPolling();
+        stopFallback();
         setRealtimeState("live");
+        applyStatus(message.data);
       };
-      socket.onmessage = (event) => {
-        const message = parseVehicleStatusMessage(String(event.data));
-        if (message) applyStatus(message.data);
+      candidate.onerror = () => {
+        if (active && socket === candidate) candidate.close();
       };
-      socket.onerror = () => socket?.close();
-      socket.onclose = () => {
-        if (!active) return;
-        setRealtimeState("reconnecting");
-        startFallback();
-        const delay = reconnectDelay(reconnectAttempt);
-        reconnectAttempt += 1;
-        reconnectId = window.setTimeout(connect, delay);
+      candidate.onclose = (event) => {
+        if (!active || socket !== candidate) return;
+        socket = null;
+        if (event.code === 4404) {
+          stopFallback();
+          setRealtimeState("disconnected");
+          return;
+        }
+        scheduleReconnect();
       };
     };
 
@@ -118,10 +144,18 @@ export function useVehicleStatus(deviceId: string) {
     connect();
     return () => {
       active = false;
-      stopPolling();
+      stopFallback();
       if (reconnectId !== null) window.clearTimeout(reconnectId);
       controllers.forEach((controller) => controller.abort());
-      socket?.close();
+      if (socket !== null) {
+        const closingSocket = socket;
+        socket = null;
+        closingSocket.onopen = null;
+        closingSocket.onmessage = null;
+        closingSocket.onerror = null;
+        closingSocket.onclose = null;
+        closingSocket.close();
+      }
     };
   }, [deviceId]);
 

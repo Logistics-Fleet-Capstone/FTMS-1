@@ -33,8 +33,7 @@ def semantic_values(event):
     return data
 
 
-def latest_status_data(vehicle):
-    event = vehicle.telemetry_events.select_related("vehicle").first()
+def vehicle_status_data(vehicle, event):
     return {
         "vehicle": {
             "device_id": vehicle.device_id,
@@ -43,3 +42,8 @@ def latest_status_data(vehicle):
         },
         "latest": None if event is None else event_data(event),
     }
+
+
+def latest_status_data(vehicle):
+    event = vehicle.telemetry_events.select_related("vehicle").first()
+    return vehicle_status_data(vehicle, event)

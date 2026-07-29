@@ -8,7 +8,8 @@ from django.test import TransactionTestCase
 from fleet.models import Vehicle
 from telemetry.models import TelemetryEvent
 from telemetry.mqtt import handle_mqtt_message
-from telemetry.services import IngestionStatus, ingest_telemetry
+from telemetry.realtime import broadcast_vehicle_status
+from telemetry.services import IngestionStatus, _broadcast_if_latest, ingest_telemetry
 
 
 class RealtimeIngestionTests(TransactionTestCase):
@@ -60,7 +61,7 @@ class RealtimeIngestionTests(TransactionTestCase):
         self.assertIsNone(event.rpm)
         self.assertEqual(event.coolant_c, 0)
         self.assertEqual(event.engine_load_pct, 0)
-        broadcast.assert_called_once()
+        broadcast.assert_called_once_with(event)
 
     @patch("telemetry.services.broadcast_vehicle_status")
     def test_duplicate_and_conflict_do_not_add_rows_or_broadcast(self, broadcast):
@@ -104,6 +105,48 @@ class RealtimeIngestionTests(TransactionTestCase):
 
         self.assertEqual(result.status, IngestionStatus.CREATED)
         self.assertTrue(TelemetryEvent.objects.filter(event_id="mqtt-event-1").exists())
+
+    def test_post_commit_presentation_failure_does_not_misreport_ingestion(self):
+        with patch(
+            "telemetry.realtime.vehicle_status_data",
+            side_effect=RuntimeError("presentation unavailable"),
+        ):
+            result = ingest_telemetry(self.payload)
+
+        self.assertEqual(result.status, IngestionStatus.CREATED)
+        self.assertTrue(TelemetryEvent.objects.filter(event_id="mqtt-event-1").exists())
+
+    def test_broadcast_uses_event_that_passed_latest_check_without_requery(self):
+        first = ingest_telemetry(self.payload).event
+        layer = SimpleNamespace(group_send=AsyncMock())
+
+        def commit_newer_then_broadcast(checked_event):
+            newer = deepcopy(self.payload)
+            newer.update(
+                event_id="newer-concurrent-event",
+                sequence_number=202,
+                recorded_at="2026-07-29T11:00:00Z",
+            )
+            TelemetryEvent.objects.create(**self.serializer_values(newer))
+            broadcast_vehicle_status(checked_event)
+
+        with (
+            patch("telemetry.services.broadcast_vehicle_status") as broadcast,
+            patch("telemetry.realtime.get_channel_layer", return_value=layer),
+        ):
+            broadcast.side_effect = commit_newer_then_broadcast
+            _broadcast_if_latest(first.event_id)
+
+        broadcast.assert_called_once()
+        message = layer.group_send.await_args.args[1]["message"]
+        self.assertEqual(message["data"]["latest"]["event_id"], first.event_id)
+
+    def serializer_values(self, payload):
+        from telemetry.serializers import TelemetryEventInputSerializer
+
+        serializer = TelemetryEventInputSerializer(data=payload)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        return serializer.create_model_values()
 
     def test_invalid_mqtt_messages_are_rejected_without_rows(self):
         invalid_payloads = [

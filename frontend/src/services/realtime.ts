@@ -13,31 +13,52 @@ function isNullableNumber(value: unknown): value is number | null {
   return value === null || (typeof value === "number" && Number.isFinite(value));
 }
 
-function isTelemetryEvent(value: unknown): value is TelemetryEvent {
+function isNumberInRange(value: unknown, minimum: number, maximum: number) {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= minimum &&
+    value <= maximum
+  );
+}
+
+function isValidTimestamp(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+function isTelemetryEvent(
+  value: unknown,
+  vehicleDeviceId: string,
+): value is TelemetryEvent {
   if (!isRecord(value)) return false;
   return (
     value.schema_version === "1.0" &&
     typeof value.event_id === "string" &&
-    typeof value.sequence_number === "number" &&
-    typeof value.device_id === "string" &&
-    typeof value.recorded_at === "string" &&
-    typeof value.received_at === "string" &&
-    typeof value.latitude === "number" &&
-    Number.isFinite(value.latitude) &&
-    typeof value.longitude === "number" &&
-    Number.isFinite(value.longitude) &&
-    typeof value.gnss_speed_kph === "number" &&
-    Number.isFinite(value.gnss_speed_kph) &&
-    isNullableNumber(value.rpm) &&
+    Number.isSafeInteger(value.sequence_number) &&
+    Number(value.sequence_number) >= 0 &&
+    value.device_id === vehicleDeviceId &&
+    isValidTimestamp(value.recorded_at) &&
+    isValidTimestamp(value.received_at) &&
+    isNumberInRange(value.latitude, -90, 90) &&
+    isNumberInRange(value.longitude, -180, 180) &&
+    isNumberInRange(value.gnss_speed_kph, 0, 300) &&
+    (value.rpm === null ||
+      (Number.isSafeInteger(value.rpm) &&
+        Number(value.rpm) >= 0 &&
+        Number(value.rpm) <= 12_000)) &&
     isNullableNumber(value.coolant_c) &&
-    isNullableNumber(value.engine_load_pct) &&
+    (value.engine_load_pct === null ||
+      isNumberInRange(value.engine_load_pct, 0, 100)) &&
     ["NORMAL", "HARSH_BRAKING", "HARSH_ACCELERATION", "SHARP_TURN"].includes(
       String(value.driving_event),
     )
   );
 }
 
-export function parseVehicleStatusMessage(raw: string): VehicleStatusMessage | null {
+export function parseVehicleStatusMessage(
+  raw: string,
+  requestedDeviceId: string,
+): VehicleStatusMessage | null {
   try {
     const message: unknown = JSON.parse(raw);
     if (!isRecord(message) || !isRecord(message.data)) return null;
@@ -52,9 +73,11 @@ export function parseVehicleStatusMessage(raw: string): VehicleStatusMessage | n
     if (
       !isRecord(vehicle) ||
       typeof vehicle.device_id !== "string" ||
+      vehicle.device_id.length === 0 ||
+      vehicle.device_id !== requestedDeviceId ||
       typeof vehicle.plate_number !== "string" ||
       typeof vehicle.display_name !== "string" ||
-      (latest !== null && !isTelemetryEvent(latest))
+      (latest !== null && !isTelemetryEvent(latest, vehicle.device_id))
     ) {
       return null;
     }

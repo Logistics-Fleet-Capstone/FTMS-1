@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+from unittest.mock import patch
 
 from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
@@ -9,8 +10,9 @@ from django.contrib.gis.geos import Point
 from django.test import TransactionTestCase, override_settings
 
 from fleet.models import Vehicle
+from telemetry.consumers import VehicleStatusConsumer
 from telemetry.models import TelemetryEvent
-from telemetry.presentation import latest_status_data
+from telemetry.presentation import latest_status_data, vehicle_status_data
 from telemetry.realtime import vehicle_status_group
 from telemetry.routing import websocket_urlpatterns
 
@@ -70,6 +72,51 @@ class VehicleStatusWebSocketTests(TransactionTestCase):
 
         self.assertFalse(connected)
         self.assertEqual(close_code, 4404)
+        self.assertNotIn(vehicle_status_group("UNKNOWN"), get_channel_layer().groups)
+
+    async def test_update_during_snapshot_window_is_queued_after_snapshot(self):
+        vehicle = await self.create_vehicle()
+        original = await self.create_event(vehicle)
+
+        async def snapshot_with_concurrent_update(consumer, device_id):
+            snapshot = await database_sync_to_async(latest_status_data)(vehicle)
+            newer = await self.create_event(
+                vehicle,
+                event_id="connection-window-event",
+                sequence_number=2,
+                recorded_at=datetime(2026, 7, 29, 11, tzinfo=UTC),
+            )
+            update = {
+                "type": "vehicle.status.updated",
+                "data": await database_sync_to_async(vehicle_status_data)(
+                    vehicle, newer
+                ),
+            }
+            await get_channel_layer().group_send(
+                vehicle_status_group(device_id),
+                {"type": "vehicle.status", "message": update},
+            )
+            return snapshot
+
+        communicator = WebsocketCommunicator(
+            URLRouter(websocket_urlpatterns),
+            "/ws/v1/vehicles/LILYGO-001/status/",
+        )
+        with patch.object(
+            VehicleStatusConsumer, "_snapshot", new=snapshot_with_concurrent_update
+        ):
+            connected, _ = await communicator.connect()
+            snapshot = await communicator.receive_json_from()
+            update = await communicator.receive_json_from()
+
+        self.assertTrue(connected)
+        self.assertEqual(snapshot["type"], "vehicle.status.snapshot")
+        self.assertEqual(snapshot["data"]["latest"]["event_id"], original.event_id)
+        self.assertEqual(update["type"], "vehicle.status.updated")
+        self.assertEqual(
+            update["data"]["latest"]["event_id"], "connection-window-event"
+        )
+        await communicator.disconnect()
 
     @database_sync_to_async
     def create_vehicle(self):
@@ -80,17 +127,19 @@ class VehicleStatusWebSocketTests(TransactionTestCase):
         )
 
     @database_sync_to_async
-    def create_event(self, vehicle):
-        return TelemetryEvent.objects.create(
-            schema_version="1.0",
-            event_id="websocket-event",
-            sequence_number=1,
-            vehicle=vehicle,
-            recorded_at=datetime(2026, 7, 29, 10, tzinfo=UTC),
-            location=Point(121.0196, 14.5186, srid=4326),
-            gnss_speed_kph=Decimal("38.20"),
-            rpm=None,
-            coolant_c=Decimal("88.00"),
-            engine_load_pct=Decimal("34.00"),
-            driving_event="NORMAL",
-        )
+    def create_event(self, vehicle, **overrides):
+        values = {
+            "schema_version": "1.0",
+            "event_id": "websocket-event",
+            "sequence_number": 1,
+            "vehicle": vehicle,
+            "recorded_at": datetime(2026, 7, 29, 10, tzinfo=UTC),
+            "location": Point(121.0196, 14.5186, srid=4326),
+            "gnss_speed_kph": Decimal("38.20"),
+            "rpm": None,
+            "coolant_c": Decimal("88.00"),
+            "engine_load_pct": Decimal("34.00"),
+            "driving_event": "NORMAL",
+        }
+        values.update(overrides)
+        return TelemetryEvent.objects.create(**values)

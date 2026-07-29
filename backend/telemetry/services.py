@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -7,6 +8,8 @@ from telemetry.models import TelemetryEvent
 from telemetry.presentation import semantic_values
 from telemetry.realtime import broadcast_vehicle_status
 from telemetry.serializers import TelemetryEventInputSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class IngestionStatus(StrEnum):
@@ -52,10 +55,17 @@ def _existing_result(event, serializer):
 
 
 def _broadcast_if_latest(event_id):
-    event = TelemetryEvent.objects.select_related("vehicle").get(event_id=event_id)
-    latest = event.vehicle.telemetry_events.first()
-    if latest and latest.pk == event.pk:
-        broadcast_vehicle_status(event.vehicle)
+    try:
+        event = TelemetryEvent.objects.select_related("vehicle").get(event_id=event_id)
+        latest = event.vehicle.telemetry_events.only("pk").first()
+        if latest and latest.pk == event.pk:
+            broadcast_vehicle_status(event)
+    except Exception:
+        logger.exception(
+            "Post-commit real-time processing failed for event_id=%s; "
+            "REST fallback remains available",
+            event_id,
+        )
 
 
 def ingest_telemetry(payload):

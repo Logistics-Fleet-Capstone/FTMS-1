@@ -7,6 +7,11 @@ import type {
   TelemetryEvent,
 } from "./services/telemetry";
 
+const { setViewMock, mapMock } = vi.hoisted(() => {
+  const setView = vi.fn();
+  return { setViewMock: setView, mapMock: { setView } };
+});
+
 vi.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="map">{children}</div>
@@ -17,7 +22,7 @@ vi.mock("react-leaflet", () => ({
   CircleMarker: ({ center }: { center: [number, number] }) => (
     <span data-testid="marker">{center.join(",")}</span>
   ),
-  useMap: () => ({ setView: vi.fn() }),
+  useMap: () => mapMock,
 }));
 
 const health = { status: "ok", service: "ftms-backend", database: "ok" };
@@ -54,7 +59,7 @@ class FakeWebSocket {
   onopen: (() => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: (() => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
   closed = false;
 
   constructor(public url: string) {
@@ -73,10 +78,10 @@ class FakeWebSocket {
     this.onmessage?.({ data: "{" } as MessageEvent);
   }
 
-  close() {
+  close(code = 1006) {
     if (this.closed) return;
     this.closed = true;
-    this.onclose?.();
+    this.onclose?.({ code } as CloseEvent);
   }
 }
 
@@ -98,6 +103,7 @@ function update(overrides: Partial<TelemetryEvent> = {}) {
 
 beforeEach(() => {
   FakeWebSocket.instances = [];
+  setViewMock.mockClear();
   vi.stubGlobal("WebSocket", FakeWebSocket);
 });
 
@@ -197,16 +203,81 @@ describe("Sprint 2 vehicle status", () => {
 
     await act(async () => vi.advanceTimersByTimeAsync(5_000));
     expect(fetchMock.mock.calls.length).toBe(baseline + 2);
-    act(() => FakeWebSocket.instances.at(-1)?.open());
+    act(() => {
+      const reconnected = FakeWebSocket.instances.at(-1);
+      reconnected?.open();
+      reconnected?.message({ type: "vehicle.status.snapshot", data: latest });
+    });
     await act(async () => vi.advanceTimersByTimeAsync(5_000));
     expect(fetchMock.mock.calls.length).toBe(baseline + 2);
   });
 
-  test("reconnect backoff is bounded at thirty seconds", () => {
-    expect(reconnectDelay(0)).toBe(1_000);
-    expect(reconnectDelay(4)).toBe(16_000);
-    expect(reconnectDelay(5)).toBe(30_000);
+  test("rapid open-close cycles increase actual reconnect delays to the cap", async () => {
+    vi.useFakeTimers();
+    mockFetch();
+    render(<App />);
+    await act(async () => Promise.resolve());
+
+    for (const [index, delay] of [1_000, 2_000, 4_000, 8_000, 16_000, 30_000].entries()) {
+      const socket = FakeWebSocket.instances[index];
+      act(() => {
+        socket.open();
+        socket.close();
+      });
+      await act(async () => vi.advanceTimersByTimeAsync(delay - 1));
+      expect(FakeWebSocket.instances).toHaveLength(index + 1);
+      await act(async () => vi.advanceTimersByTimeAsync(1));
+      expect(FakeWebSocket.instances).toHaveLength(index + 2);
+    }
+
+    const cappedSocket = FakeWebSocket.instances.at(-1)!;
+    act(() => {
+      cappedSocket.open();
+      cappedSocket.close();
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(29_999));
+    expect(FakeWebSocket.instances).toHaveLength(7);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(FakeWebSocket.instances).toHaveLength(8);
     expect(reconnectDelay(20)).toBe(30_000);
+  });
+
+  test("a valid message resets backoff and permanent 4404 does not retry", async () => {
+    vi.useFakeTimers();
+    mockFetch();
+    render(<App />);
+    await act(async () => Promise.resolve());
+    act(() => FakeWebSocket.instances[0].close());
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    act(() => {
+      FakeWebSocket.instances[1].open();
+      FakeWebSocket.instances[1].message({
+        type: "vehicle.status.snapshot",
+        data: waiting,
+      });
+      FakeWebSocket.instances[1].close(4404);
+    });
+    expect(screen.getByText(/Real-time status: Disconnected/)).toBeInTheDocument();
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(FakeWebSocket.instances).toHaveLength(2);
+  });
+
+  test("obsolete socket handlers cannot affect a newer socket", async () => {
+    vi.useFakeTimers();
+    mockFetch();
+    render(<App />);
+    await act(async () => Promise.resolve());
+    const obsolete = FakeWebSocket.instances[0];
+    const obsoleteClose = obsolete.onclose;
+    act(() => obsolete.close());
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    const current = FakeWebSocket.instances[1];
+
+    act(() => obsoleteClose?.({ code: 1006 } as CloseEvent));
+    await act(async () => vi.advanceTimersByTimeAsync(2_000));
+
+    expect(current.closed).toBe(false);
+    expect(FakeWebSocket.instances).toHaveLength(2);
   });
 
   test("unmount closes sockets, aborts requests, and clears timers", async () => {
@@ -223,6 +294,23 @@ describe("Sprint 2 vehicle status", () => {
     expect(fetchMock.mock.calls.length).toBe(callsBeforeUnmount);
   });
 
+  test("unmount aborts an active latest-status request", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      if (String(input).includes("/health/")) return Promise.resolve(Response.json(health));
+      return new Promise<Response>(() => undefined);
+    });
+    const { unmount } = render(<App />);
+    await act(async () => Promise.resolve());
+    const statusCall = vi.mocked(fetch).mock.calls.find(
+      ([input]) => String(input).includes("/latest-status/"),
+    );
+    const signal = statusCall?.[1]?.signal;
+
+    expect(signal?.aborted).toBe(false);
+    unmount();
+    expect(signal?.aborted).toBe(true);
+  });
+
   test("renders stale and error states independently", async () => {
     const stale = {
       ...latest,
@@ -236,7 +324,7 @@ describe("Sprint 2 vehicle status", () => {
     expect(await screen.findByText("Stale telemetry")).toBeInTheDocument();
   });
 
-  test("shows disconnected when WebSocket construction fails", async () => {
+  test("shows reconnecting fallback when WebSocket construction fails", async () => {
     mockFetch();
     vi.stubGlobal("WebSocket", class {
       constructor() {
@@ -244,7 +332,75 @@ describe("Sprint 2 vehicle status", () => {
       }
     });
     render(<App />);
-    expect(await screen.findByText(/Real-time status: Disconnected/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Real-time status: Reconnecting \/ REST fallback/),
+    ).toBeInTheDocument();
+  });
+
+  test("rejects mismatched inner devices, invalid dates, coordinates, and numbers", async () => {
+    mockFetch(latest);
+    render(<App />);
+    await screen.findByTestId("marker");
+    const socket = FakeWebSocket.instances[0];
+    const invalidMessages = [
+      update({ device_id: "OTHER", latitude: 1 }),
+      update({ recorded_at: "not-a-date", latitude: 2 }),
+      update({ received_at: "not-a-date", latitude: 3 }),
+      update({ latitude: 91 }),
+      update({ longitude: 181 }),
+      update({ sequence_number: -1, latitude: 4 }),
+      update({ sequence_number: Number.MAX_SAFE_INTEGER + 1, latitude: 4 }),
+      update({ gnss_speed_kph: Number.POSITIVE_INFINITY, latitude: 5 }),
+      update({ gnss_speed_kph: 301, latitude: 5 }),
+      update({ rpm: 12_001, latitude: 6 }),
+      update({ engine_load_pct: 101, latitude: 7 }),
+    ];
+
+    act(() => invalidMessages.forEach((message) => socket.message(message)));
+
+    expect(screen.getByTestId("marker")).toHaveTextContent("14.5186,121.0196");
+  });
+
+  test("accepts valid nullable OBD-II values", async () => {
+    mockFetch();
+    render(<App />);
+    await screen.findByText(/Waiting for the first telemetry event/);
+    act(() => FakeWebSocket.instances[0].message(update({
+      rpm: null,
+      coolant_c: null,
+      engine_load_pct: null,
+    })));
+    expect(screen.getAllByText("Unavailable")).toHaveLength(3);
+  });
+
+  test("freshness clock does not recenter until newer coordinates arrive", async () => {
+    vi.useFakeTimers();
+    mockFetch(latest);
+    render(<App />);
+    await act(async () => Promise.resolve());
+    expect(setViewMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    expect(setViewMock).toHaveBeenCalledTimes(1);
+
+    act(() => FakeWebSocket.instances[0].message(update({
+      event_id: "moved",
+      sequence_number: 2,
+      recorded_at: new Date(Date.now()).toISOString(),
+      latitude: 14.52,
+      longitude: 121.02,
+    })));
+    expect(setViewMock).toHaveBeenCalledTimes(2);
+    expect(setViewMock).toHaveBeenLastCalledWith([14.52, 121.02]);
+
+    act(() => FakeWebSocket.instances[0].message(update({
+      event_id: "older-position",
+      sequence_number: 0,
+      recorded_at: new Date(Date.now() - 60_000).toISOString(),
+      latitude: 1,
+      longitude: 2,
+    })));
+    expect(setViewMock).toHaveBeenCalledTimes(2);
   });
 
   test("shows the latest-status error while backend health remains connected", async () => {

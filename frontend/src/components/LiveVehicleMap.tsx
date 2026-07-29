@@ -6,9 +6,10 @@ type Position = [latitude: number, longitude: number];
 
 function Recenter({ position }: { position: Position }) {
   const map = useMap();
+  const [latitude, longitude] = position;
   useEffect(() => {
-    map.setView(position);
-  }, [map, position]);
+    map.setView([latitude, longitude]);
+  }, [latitude, longitude, map]);
   return null;
 }
 
