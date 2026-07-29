@@ -4,10 +4,11 @@ import App from "./App";
 
 const health = { status: "ok", service: "ftms-backend", database: "ok" };
 const waiting = {
-  device_id: "LILYGO-001",
-  plate_number: "DEMO-001",
-  display_name: "Simulated Pilot Vehicle",
-  is_active: true,
+  vehicle: {
+    device_id: "LILYGO-001",
+    plate_number: "DEMO-001",
+    display_name: "Sprint 1 Demo Vehicle",
+  },
   latest: null,
 };
 const latest = {
@@ -58,6 +59,11 @@ test("renders the latest telemetry and unavailable nullable values", async () =>
   expect(screen.getByText("Unavailable")).toBeInTheDocument();
   expect(screen.getByText("88 °C")).toBeInTheDocument();
   expect(screen.getByText("14.5186, 121.0196")).toBeInTheDocument();
+  expect(screen.getByText("Sprint 1 Demo Vehicle")).toBeInTheDocument();
+  expect(screen.getByText("Recorded at")).toBeInTheDocument();
+  expect(screen.getByText("Received at")).toBeInTheDocument();
+  expect(screen.getByText(new Date(latest.latest.recorded_at).toLocaleString())).toBeInTheDocument();
+  expect(screen.getByText(new Date(latest.latest.received_at).toLocaleString())).toBeInTheDocument();
 });
 
 test("shows an independent latest-status error", async () => {

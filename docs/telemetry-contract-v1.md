@@ -24,7 +24,7 @@ It does not implement MQTT or real LILYGO hardware integration.
 - `event_id` is required and globally unique; `sequence_number` must be a non-negative integer.
 - `device_id` must identify an active `Vehicle`.
 - `recorded_at` must include a timezone. It is normalized and stored in UTC, and differs
-  from the server-assigned `received_at`.
+  from the server-generated and persisted `received_at`.
 - Latitude is `-90..90`, longitude is `-180..180`, speed is `0..300` km/h, RPM is
   `0..12000`, and engine load is `0..100` percent.
 - Coordinates are stored as a PostGIS point with SRID 4326 in longitude/latitude order.
@@ -34,3 +34,26 @@ It does not implement MQTT or real LILYGO hardware integration.
 
 Accepted events are append-only. Replaying the exact semantic event is idempotent; reusing
 its ID for different data returns `409 Conflict`.
+
+The seeded local pilot is exactly:
+
+```text
+device_id: LILYGO-001
+plate_number: DEMO-001
+display_name: Sprint 1 Demo Vehicle
+is_active: true
+```
+
+Run the standard-library simulator with:
+
+```bash
+python simulator/telemetry_simulator.py \
+  --api-base-url http://localhost:8000 \
+  --device-id LILYGO-001 \
+  --count 5 \
+  --interval 0.1
+```
+
+This REST endpoint is intentionally unauthenticated for local Sprint 1 development only.
+See `docs/api-contracts.md` for complete request, success, duplicate, validation, conflict,
+latest-status, and unknown-device JSON examples.

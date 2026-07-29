@@ -48,8 +48,16 @@ Prepare the Sprint 1 database state and run the simulator:
 ```bash
 docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py seed_demo_vehicle
-python3 simulator/simulate_telemetry.py --count 5 --interval-seconds 0.2
+python simulator/telemetry_simulator.py \
+  --api-base-url http://localhost:8000 \
+  --device-id LILYGO-001 \
+  --count 5 \
+  --interval 0.1
 ```
+
+The seed command idempotently reconciles `LILYGO-001`, plate `DEMO-001`, display name
+`Sprint 1 Demo Vehicle`, and active status. Local Sprint 1 ingestion is intentionally
+unauthenticated and must not be exposed as a production API.
 
 ## Verification commands
 

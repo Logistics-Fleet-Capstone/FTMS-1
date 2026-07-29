@@ -12,17 +12,22 @@ docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py seed_demo_vehicle
 ```
 
-Send one event:
+Send one event with the defaults (`http://localhost:8000` and `LILYGO-001`):
 
 ```bash
-python3 simulator/simulate_telemetry.py
+python simulator/telemetry_simulator.py
 ```
 
-Send five events at a shorter interval:
+Send five events using the complete supported interface:
 
 ```bash
-python3 simulator/simulate_telemetry.py --count 5 --interval-seconds 0.2
+python simulator/telemetry_simulator.py \
+  --api-base-url http://localhost:8000 \
+  --device-id LILYGO-001 \
+  --count 5 \
+  --interval 0.1
 ```
 
 The third sample deliberately sends unavailable OBD-II fields as JSON `null`, never as
-fabricated zeroes. Each run uses unique event IDs and increasing sequence numbers.
+fabricated zeroes. Each run uses unique event IDs, increasing sequence numbers, and
+timezone-aware UTC timestamps. A failed submission exits nonzero.

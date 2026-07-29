@@ -11,7 +11,7 @@ class Command(BaseCommand):
             device_id="LILYGO-001",
             defaults={
                 "plate_number": "DEMO-001",
-                "display_name": "Simulated Pilot Vehicle",
+                "display_name": "Sprint 1 Demo Vehicle",
                 "is_active": True,
             },
         )

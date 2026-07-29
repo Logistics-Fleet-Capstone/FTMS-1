@@ -11,14 +11,14 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 
-def build_event(sequence_number):
+def build_event(sequence_number, device_id):
     sample_index = sequence_number % 5
     nullable_sample = sample_index == 2
     return {
         "schema_version": "1.0",
         "event_id": f"sim-{sequence_number}-{uuid4()}",
         "sequence_number": sequence_number,
-        "device_id": "LILYGO-001",
+        "device_id": device_id,
         "recorded_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "latitude": round(14.5186 + sample_index * 0.0001, 6),
         "longitude": round(121.0196 + sample_index * 0.0001, 6),
@@ -44,13 +44,14 @@ def send_event(url, event):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--url",
-        default="http://localhost:8000/api/v1/telemetry/",
-        help="Telemetry ingestion endpoint.",
+        "--api-base-url",
+        default="http://localhost:8000",
+        help="FTMS API base URL.",
     )
+    parser.add_argument("--device-id", default="LILYGO-001", help="Vehicle device ID.")
     parser.add_argument("--count", type=int, default=1, help="Number of events to send.")
     parser.add_argument(
-        "--interval-seconds",
+        "--interval",
         type=float,
         default=1.0,
         help="Delay between events.",
@@ -60,24 +61,25 @@ def parse_args():
 
 def main():
     args = parse_args()
-    if args.count < 1 or args.interval_seconds < 0:
-        print("count must be positive and interval-seconds cannot be negative", file=sys.stderr)
+    if args.count < 1 or args.interval < 0:
+        print("count must be positive and interval cannot be negative", file=sys.stderr)
         return 2
 
+    url = f"{args.api_base_url.rstrip('/')}/api/v1/telemetry/"
     sequence_start = int(time.time() * 1000)
     for offset in range(args.count):
-        event = build_event(sequence_start + offset)
+        event = build_event(sequence_start + offset, args.device_id)
         try:
-            status, response = send_event(args.url, event)
+            status, response = send_event(url, event)
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             print(f"failed to send {event['event_id']}: {exc}", file=sys.stderr)
             return 1
         print(
             f"{status} {event['event_id']} "
-            f"created={response.get('created')} duplicate={response.get('duplicate')}"
+            f"status={response.get('status')} duplicate={response.get('duplicate')}"
         )
         if offset + 1 < args.count:
-            time.sleep(args.interval_seconds)
+            time.sleep(args.interval)
     return 0
 
 

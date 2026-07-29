@@ -40,3 +40,9 @@ The Sprint 1 simulator intentionally calls REST directly. Mosquitto, Channels, C
 their locked configuration remain available but are not used by this slice. Celery will
 handle durable asynchronous work in a later approved sprint; OR-Tools and XGBoost likewise
 remain future work.
+
+The REST ingestion endpoint is unauthenticated for local Sprint 1 development only. The
+backend assigns `received_at`, normalizes device observation times to UTC, and stores
+coordinates as PostGIS points with SRID 4326. Latest status is chosen by `recorded_at`,
+then sequence number, receipt time, and primary key; delayed older observations do not
+replace a newer vehicle status.

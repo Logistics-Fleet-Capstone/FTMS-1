@@ -15,10 +15,11 @@ export type TelemetryEvent = {
 };
 
 export type LatestStatusResponse = {
-  device_id: string;
-  plate_number: string;
-  display_name: string;
-  is_active: boolean;
+  vehicle: {
+    device_id: string;
+    plate_number: string;
+    display_name: string;
+  };
   latest: TelemetryEvent | null;
 };
 

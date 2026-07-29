@@ -113,8 +113,8 @@ export default function App() {
           {connection === "connected" && vehicleState === "ready" && latest && (
             <>
               <div className="vehicle-identity">
-                <strong>{vehicle.display_name}</strong>
-                <span>{vehicle.plate_number}</span>
+                <strong>{vehicle.vehicle.display_name}</strong>
+                <span>{vehicle.vehicle.plate_number}</span>
               </div>
               <dl className="telemetry-grid">
                 <div>
@@ -146,6 +146,10 @@ export default function App() {
                 <div className="telemetry-grid__wide">
                   <dt>Recorded at</dt>
                   <dd>{new Date(latest.recorded_at).toLocaleString()}</dd>
+                </div>
+                <div className="telemetry-grid__wide">
+                  <dt>Received at</dt>
+                  <dd>{new Date(latest.received_at).toLocaleString()}</dd>
                 </div>
               </dl>
             </>

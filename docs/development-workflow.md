@@ -29,5 +29,14 @@ docker compose exec backend python manage.py seed_demo_vehicle
 docker compose exec backend python manage.py seed_demo_vehicle
 ```
 
-Then send pilot data with `python3 simulator/simulate_telemetry.py`. The simulator requires
-no third-party Python packages. See `simulator/README.md` for count and interval options.
+Then send pilot data with:
+
+```bash
+python simulator/telemetry_simulator.py \
+  --api-base-url http://localhost:8000 \
+  --device-id LILYGO-001 \
+  --count 5 \
+  --interval 0.1
+```
+
+The simulator requires no third-party Python packages.

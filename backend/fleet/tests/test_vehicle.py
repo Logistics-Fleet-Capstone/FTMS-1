@@ -34,5 +34,5 @@ class VehicleTests(TestCase):
         self.assertEqual(Vehicle.objects.filter(device_id="LILYGO-001").count(), 1)
         vehicle = Vehicle.objects.get(device_id="LILYGO-001")
         self.assertEqual(vehicle.plate_number, "DEMO-001")
-        self.assertEqual(vehicle.display_name, "Simulated Pilot Vehicle")
+        self.assertEqual(vehicle.display_name, "Sprint 1 Demo Vehicle")
         self.assertTrue(vehicle.is_active)

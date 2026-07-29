@@ -17,7 +17,7 @@ class TelemetryApiTests(TestCase):
         self.vehicle = Vehicle.objects.create(
             device_id="LILYGO-001",
             plate_number="DEMO-001",
-            display_name="Simulated Pilot Vehicle",
+            display_name="Sprint 1 Demo Vehicle",
         )
         self.payload = {
             "schema_version": "1.0",
@@ -41,7 +41,9 @@ class TelemetryApiTests(TestCase):
         response = self.post()
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["created"], True)
+        self.assertEqual(response.json()["status"], "created")
+        self.assertFalse(response.json()["duplicate"])
+        self.assertNotIn("created", response.json())
         event = TelemetryEvent.objects.get()
         self.assertEqual(event.location.srid, 4326)
         self.assertAlmostEqual(event.location.y, 14.5186)
@@ -52,7 +54,9 @@ class TelemetryApiTests(TestCase):
         response = self.post()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["duplicate"], True)
+        self.assertEqual(response.json()["status"], "duplicate")
+        self.assertTrue(response.json()["duplicate"])
+        self.assertNotIn("created", response.json())
         self.assertEqual(TelemetryEvent.objects.count(), 1)
 
     def test_equivalent_numeric_and_timezone_values_are_duplicate(self):
@@ -82,6 +86,10 @@ class TelemetryApiTests(TestCase):
         response = self.post(conflict)
 
         self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json(),
+            {"detail": "event_id already exists with different telemetry data."},
+        )
         self.assertEqual(TelemetryEvent.objects.get().gnss_speed_kph, Decimal("38.20"))
 
     def test_nullable_obd_values_remain_null(self):
@@ -96,10 +104,72 @@ class TelemetryApiTests(TestCase):
         self.assertIsNone(event.coolant_c)
         self.assertIsNone(event.engine_load_pct)
 
+    def test_legitimate_numeric_zero_remains_zero(self):
+        payload = deepcopy(self.payload)
+        payload.update(
+            {
+                "gnss_speed_kph": 0,
+                "rpm": 0,
+                "coolant_c": 0,
+                "engine_load_pct": 0,
+            }
+        )
+
+        response = self.post(payload)
+
+        self.assertEqual(response.status_code, 201)
+        event = TelemetryEvent.objects.get()
+        self.assertEqual(event.gnss_speed_kph, Decimal("0.00"))
+        self.assertEqual(event.rpm, 0)
+        self.assertEqual(event.coolant_c, Decimal("0.00"))
+        self.assertEqual(event.engine_load_pct, Decimal("0.00"))
+        self.assertEqual(response.json()["event"]["rpm"], 0)
+
+    def test_received_at_is_server_generated_and_persisted(self):
+        before = datetime.now(UTC)
+        response = self.post()
+        after = datetime.now(UTC)
+
+        event = TelemetryEvent.objects.get()
+        self.assertLessEqual(before, event.received_at)
+        self.assertLessEqual(event.received_at, after)
+        self.assertEqual(
+            response.json()["event"]["received_at"],
+            event.received_at.isoformat().replace("+00:00", "Z"),
+        )
+
+    def test_offset_recorded_at_is_stored_and_returned_in_utc(self):
+        response = self.post()
+
+        event = TelemetryEvent.objects.get()
+        self.assertEqual(event.recorded_at, datetime(2026, 7, 29, 1, 18, 20, tzinfo=UTC))
+        self.assertEqual(response.json()["event"]["recorded_at"], "2026-07-29T01:18:20Z")
+
     def test_rejects_unsupported_schema_version(self):
         payload = deepcopy(self.payload)
         payload["schema_version"] = "2.0"
-        self.assertEqual(self.post(payload).status_code, 400)
+        response = self.post(payload)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(TelemetryEvent.objects.count(), 0)
+
+    def test_safe_validation_error_excludes_internal_details(self):
+        payload = deepcopy(self.payload)
+        payload["device_id"] = "UNKNOWN"
+
+        response = self.post(payload)
+
+        rendered = response.content.decode().lower()
+        for forbidden in (
+            "database_url",
+            "postgres",
+            "password",
+            "select ",
+            "traceback",
+            "programmingerror",
+            "psycopg",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, rendered)
 
     def test_rejects_unknown_device(self):
         payload = deepcopy(self.payload)
@@ -156,7 +226,15 @@ class TelemetryApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.json()["latest"])
-        self.assertEqual(response.json()["plate_number"], "DEMO-001")
+        self.assertEqual(
+            response.json()["vehicle"],
+            {
+                "device_id": "LILYGO-001",
+                "plate_number": "DEMO-001",
+                "display_name": "Sprint 1 Demo Vehicle",
+            },
+        )
+        self.assertEqual(set(response.json()), {"vehicle", "latest"})
 
     def test_latest_status_returns_404_for_unknown_vehicle(self):
         response = self.client.get("/api/v1/vehicles/UNKNOWN/latest-status/")

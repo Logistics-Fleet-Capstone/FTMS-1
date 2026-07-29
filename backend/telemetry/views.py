@@ -10,9 +10,13 @@ from telemetry.presentation import event_data, semantic_values
 from telemetry.serializers import TelemetryEventInputSerializer
 
 
-def accepted_response(event, *, created, duplicate, http_status):
+def accepted_response(event, *, response_status, duplicate, http_status):
     return Response(
-        {"created": created, "duplicate": duplicate, "event": event_data(event)},
+        {
+            "status": response_status,
+            "duplicate": duplicate,
+            "event": event_data(event),
+        },
         status=http_status,
     )
 
@@ -40,16 +44,12 @@ def duplicate_or_conflict(event, serializer):
     if semantic_values(event) == incoming:
         return accepted_response(
             event,
-            created=False,
+            response_status="duplicate",
             duplicate=True,
             http_status=status.HTTP_200_OK,
         )
     return Response(
-        {
-            "created": False,
-            "duplicate": False,
-            "detail": "event_id already exists with different telemetry data.",
-        },
+        {"detail": "event_id already exists with different telemetry data."},
         status=status.HTTP_409_CONFLICT,
     )
 
@@ -81,7 +81,7 @@ class TelemetryEventCreateView(APIView):
         event.vehicle = serializer.context["vehicle"]
         return accepted_response(
             event,
-            created=True,
+            response_status="created",
             duplicate=False,
             http_status=status.HTTP_201_CREATED,
         )
@@ -95,10 +95,11 @@ class LatestVehicleStatusView(APIView):
         event = vehicle.telemetry_events.select_related("vehicle").first()
         return Response(
             {
-                "device_id": vehicle.device_id,
-                "plate_number": vehicle.plate_number,
-                "display_name": vehicle.display_name,
-                "is_active": vehicle.is_active,
+                "vehicle": {
+                    "device_id": vehicle.device_id,
+                    "plate_number": vehicle.plate_number,
+                    "display_name": vehicle.display_name,
+                },
                 "latest": None if event is None else event_data(event),
             }
         )
