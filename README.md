@@ -1,6 +1,10 @@
 # Fleet and Transportation Management System
 
-FTMS is a capstone project for a logistics fleet platform. This repository currently contains only the Sprint 0 development foundation: a React frontend, Django API, and local supporting infrastructure. Authentication, fleet records, dispatching, maps, telemetry ingestion, optimization, analytics, and IoT integration are not implemented.
+FTMS is a capstone project for a logistics fleet platform. Sprint 1 adds a bounded
+simulated-telemetry vertical slice to the Sprint 0 development foundation: a seeded pilot
+vehicle, REST ingestion, PostGIS persistence, latest-status lookup, a simulator, and one
+React status card. Authentication, dispatching, maps, MQTT ingestion, optimization,
+analytics, and real IoT integration are not implemented.
 
 ## Locked stack
 
@@ -35,7 +39,17 @@ Services:
 - Frontend: http://localhost:5173
 - Backend: http://localhost:8000
 - Health API: http://localhost:8000/api/health/
+- Telemetry ingestion: http://localhost:8000/api/v1/telemetry/
+- Pilot latest status: http://localhost:8000/api/v1/vehicles/LILYGO-001/latest-status/
 - MQTT: `localhost:1883` (anonymous access is development-only)
+
+Prepare the Sprint 1 database state and run the simulator:
+
+```bash
+docker compose exec backend python manage.py migrate
+docker compose exec backend python manage.py seed_demo_vehicle
+python3 simulator/simulate_telemetry.py --count 5 --interval-seconds 0.2
+```
 
 ## Verification commands
 
@@ -76,4 +90,6 @@ docker compose config
 - If a port is occupied, stop the conflicting local service; only development ports are published.
 - The initial database can take a short time to become healthy before Django starts.
 
-See `docs/architecture.md`, `docs/development-workflow.md`, and `docs/api-contracts.md` for design and contribution details.
+See `docs/architecture.md`, `docs/development-workflow.md`, `docs/api-contracts.md`,
+`docs/telemetry-contract-v1.md`, and `simulator/README.md` for design, contract, and
+contribution details.
