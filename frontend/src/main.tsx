@@ -8,7 +8,7 @@ import "leaflet/dist/leaflet.css";
 
 function RootRoutes() {
   const location = useLocation();
-  return location.pathname.startsWith("/transport-requests")
+  return location.pathname === "/" || location.pathname.startsWith("/transport-requests")
     ? <TransportRequestsRoute />
     : <App />;
 }
