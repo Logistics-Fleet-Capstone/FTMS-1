@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 180" role="img" aria-labelledby="title desc">
+  <title id="title">Oxford Suites Makati</title>
+  <desc id="desc">Oxford Suites Makati client logo in burgundy red</desc>
+  <rect width="720" height="180" fill="#ffffff"/>
+  <g fill="none" stroke="#b51f27" stroke-linecap="round">
+    <path d="M300 18C220 33 155 96 176 131c20 33 86 20 128-11 53-39 72-90 43-103-35-16-94 21-116 65-21 43-2 72 40 74 41 2 87-22 107-54" stroke-width="12"/>
+    <path d="M274 23C208 54 169 102 180 133" stroke-width="4"/>
+  </g>
+  <g fill="#b51f27" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif">
+    <text x="360" y="118" font-size="44" letter-spacing="6">OXFORD SUITES</text>
+    <text x="360" y="162" font-size="36" letter-spacing="12">MAKATI</text>
+  </g>
+</svg>
