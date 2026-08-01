@@ -1,0 +1,2255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FTMS — Transport Requests & Dispatch Board</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --panel-soft: #f8fafb;
+      --line: #dfe4e8;
+      --line-dark: #c9d0d6;
+      --text: #1f2933;
+      --muted: #6f7b86;
+      --muted-2: #98a2ab;
+      --green: #00a66a;
+      --green-2: #13bf7f;
+      --green-soft: #e8f8f1;
+      --blue: #2778d5;
+      --blue-soft: #eaf3ff;
+      --amber: #e49a13;
+      --amber-soft: #fff5df;
+      --red: #d94b4b;
+      --red-soft: #fff0f0;
+      --purple: #7957d5;
+      --shadow: 0 8px 28px rgba(30, 42, 52, 0.08);
+      --shadow-soft: 0 2px 8px rgba(30, 42, 52, 0.08);
+      --radius: 10px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      overflow: hidden;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 224px minmax(0, 1fr);
+      grid-template-rows: 54px minmax(0, 1fr);
+      height: 100vh;
+    }
+
+    /* topbar */
+    .topbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px 0 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+      z-index: 20;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 205px;
+    }
+    .brand-mark {
+      width: 31px;
+      height: 31px;
+      border: 2px solid #182028;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.2px;
+    }
+    .brand-text strong { display: block; font-size: 13px; letter-spacing: .2px; }
+    .brand-text span { display: block; font-size: 10px; color: var(--muted); }
+
+    .client-logo-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      padding: 0 12px;
+    }
+    .client-logo-card {
+      height: 40px;
+      min-width: min(360px, 100%);
+      max-width: 440px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 18px;
+      box-shadow: 0 2px 10px rgba(30, 42, 52, 0.05);
+    }
+    .client-logo-card img {
+      max-height: 100%;
+      max-width: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .live-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 6px 12px;
+      color: #4f5a64;
+      font-size: 11px;
+      font-weight: 700;
+      background: #f7f9fa;
+      min-width: 96px;
+    }
+    .live-pill strong {
+      color: #1f2933;
+      font-weight: 800;
+      letter-spacing: .02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #7d8892; box-shadow: 0 0 0 4px rgba(125,136,146,.10); }
+    .icon-btn {
+      width: 33px; height: 33px; border: 1px solid var(--line); border-radius: 7px; background: #fff;
+      display: grid; place-items: center; color: var(--muted); transition: .15s;
+    }
+    .icon-btn:hover { border-color: var(--line-dark); background: #f7f9fa; color: var(--text); }
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg,#1d2833,#5d6d7b);
+      color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 800;
+    }
+
+    /* sidebar */
+    .sidebar {
+      grid-column: 1;
+      grid-row: 2;
+      background: #fff;
+      border-right: 1px solid var(--line);
+      overflow-y: auto;
+      padding: 10px 10px 18px;
+    }
+    .side-section { margin-bottom: 16px; }
+    .side-title {
+      font-size: 9px;
+      letter-spacing: .12em;
+      color: var(--muted-2);
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 0 9px;
+      margin: 9px 0 5px;
+    }
+    .side-search-card {
+      margin: 5px 4px 2px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fafbfc;
+    }
+    .side-search-label {
+      font-size: 9px;
+      letter-spacing: .12em;
+      color: var(--muted-2);
+      font-weight: 800;
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+    .side-search {
+      position: relative;
+    }
+    .side-search input {
+      width: 100%;
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 0 38px 0 34px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+      font-size: 11px;
+    }
+    .side-search input:focus { border-color: #9fcdbd; box-shadow: 0 0 0 3px rgba(0,166,106,.08); }
+    .side-search::before {
+      content: "⌕";
+      position: absolute;
+      left: 11px;
+      top: 5px;
+      font-size: 18px;
+      color: var(--muted);
+    }
+    .side-shortcut {
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      font-size: 9px;
+      color: var(--muted-2);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 4px;
+      background: #fff;
+    }
+    .nav-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 33px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: #4d5964;
+      font-size: 12px;
+      text-align: left;
+    }
+    .nav-item:hover { background: #f4f7f8; }
+    .nav-item.active { color: #0b7651; background: var(--green-soft); font-weight: 750; }
+    .nav-icon,
+    .tab-icon {
+      width: 16px;
+      height: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #8b949c;
+      flex: 0 0 16px;
+    }
+    .nav-icon svg,
+    .tab-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .nav-item.active .nav-icon,
+    .stage-tab.active .tab-icon { color: #69747d; }
+    .nav-count { margin-left: auto; min-width: 20px; padding: 1px 5px; border-radius: 12px; background: #eef2f4; color: var(--muted); font-size: 9px; text-align: center; }
+    .nav-item.active .nav-count { background: #d5f2e5; color: #08794f; }
+    .star-box {
+      margin: 5px 4px 0;
+      min-height: 86px;
+      border: 1px dashed var(--line-dark);
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      color: var(--muted-2);
+      font-size: 10px;
+      text-align: center;
+      line-height: 1.5;
+      background: #fafbfc;
+    }
+
+    /* main */
+    .main {
+      grid-column: 2;
+      grid-row: 2;
+      min-width: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .page-head {
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 14px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+    .title-wrap { min-width: 190px; }
+    .title-wrap h1 { margin: 0; font-size: 18px; letter-spacing: -.25px; }
+    .title-wrap p { margin: 2px 0 0; font-size: 10px; color: var(--muted); }
+    .page-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+    .btn {
+      height: 32px;
+      border-radius: 6px;
+      border: 1px solid var(--line-dark);
+      background: #fff;
+      color: #3c4751;
+      padding: 0 11px;
+      font-size: 11px;
+      font-weight: 650;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .btn:hover { background: #f7f9fa; }
+    .btn.primary { border-color: var(--green); background: var(--green); color: #fff; }
+    .btn.primary:hover { background: #008f5b; }
+    .btn.danger { color: #b53e3e; border-color: #efc8c8; background: #fffafa; }
+    .btn.small { height: 26px; padding: 0 8px; font-size: 10px; }
+
+    .stage-tabs {
+      display: flex;
+      align-items: stretch;
+      min-height: 42px;
+      overflow-x: auto;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      padding: 0 10px;
+    }
+    .stage-tab {
+      flex: 0 0 auto;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      padding: 0 14px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .stage-tab:hover { color: var(--text); background: #fafbfc; }
+    .stage-tab.active { color: #08794f; border-bottom-color: var(--green); }
+    .badge {
+      min-width: 19px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: #eef2f4;
+      color: var(--muted);
+      font-size: 9px;
+    }
+    .stage-tab.active .badge { background: #dff5ea; color: #08794f; }
+
+    .content {
+      flex: 1;
+      min-height: 0;
+      padding: 10px;
+      display: grid;
+      grid-template-rows: minmax(280px, 45%) 58px minmax(220px, 1fr);
+      gap: 9px;
+      overflow: hidden;
+    }
+
+    .upper-grid {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 365px minmax(0,1fr);
+      gap: 9px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      min-width: 0;
+      box-shadow: var(--shadow-soft);
+    }
+    .panel-head {
+      height: 43px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 11px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+    .panel-title { font-size: 12px; font-weight: 800; }
+    .panel-sub { font-size: 9px; color: var(--muted); }
+    .panel-sub:empty { display: none; }
+
+    .filters {
+      display: grid;
+      grid-template-columns: 1fr 100px;
+      gap: 7px;
+      padding: 8px 9px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfd;
+    }
+    .field { position: relative; }
+    .field input, .field select {
+      width: 100%;
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      font-size: 10px;
+      padding: 0 9px;
+      outline: none;
+    }
+    .field input:focus, .field select:focus { border-color: #9fcdbd; }
+
+    .request-panel { display: flex; flex-direction: column; }
+    .request-list { flex: 1; min-height: 0; height: auto; overflow-y: auto; }
+    .request-row {
+      width: 100%;
+      min-height: 66px;
+      padding: 9px 10px;
+      border: 0;
+      border-bottom: 1px solid #edf0f2;
+      background: #fff;
+      display: grid;
+      grid-template-columns: 32px minmax(0,1fr) auto;
+      gap: 9px;
+      text-align: left;
+      transition: .12s;
+    }
+    .request-row:hover { background: #f8fbfa; }
+    .request-row.selected { background: #edf9f4; box-shadow: inset 3px 0 0 var(--green); }
+    .req-avatar {
+      width: 31px; height: 31px; border-radius: 7px; background: #eef3f5; color: #52606b; display: grid; place-items: center;
+      font-size: 10px; font-weight: 900;
+    }
+    .req-main { min-width: 0; }
+    .req-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .req-id { font-size: 10px; font-weight: 850; color: #26313a; }
+    .req-type { font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .req-route { margin-top: 4px; font-size: 10px; color: #4d5964; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .req-meta { margin-top: 3px; display: flex; gap: 9px; color: var(--muted); font-size: 8px; }
+    .req-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .status {
+      display: inline-flex; align-items: center; gap: 4px; min-height: 20px; padding: 0 7px; border-radius: 10px;
+      font-size: 8px; font-weight: 850; white-space: nowrap;
+    }
+    .status.new { background: var(--blue-soft); color: #1f65ad; }
+    .status.pending { background: var(--amber-soft); color: #9a690b; }
+    .status.approved { background: #e9f8f1; color: #08794f; }
+    .status.active { background: #ebf6ff; color: #176aa8; }
+    .status.completed { background: #eef2f4; color: #57636e; }
+    .status.rejected { background: var(--red-soft); color: #b43c3c; }
+    .priority { font-size: 8px; color: var(--muted); }
+    .priority.high { color: var(--red); font-weight: 800; }
+
+    .list-footer {
+      height: 37px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 9px;
+      border-top: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      font-size: 9px;
+    }
+    .pager { display: flex; align-items: center; gap: 4px; }
+    .page-btn { width: 25px; height: 24px; border: 1px solid var(--line); border-radius: 5px; background: #fff; font-size: 9px; color: var(--muted); }
+    .page-btn.active { background: var(--green); border-color: var(--green); color: #fff; }
+
+    /* map */
+    .map-panel { position: relative; background: #edf1f2; }
+    .google-map {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: #e8ecef;
+    }
+    .map-fallback {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+      background: #eef1f2;
+      color: #68747d;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+    .map-fallback.hidden { display: none; }
+    .map-fallback strong { display: block; color: #26313a; font-size: 12px; margin-bottom: 4px; }
+    .map-toolbar {
+      position: absolute;
+      left: 11px; top: 11px;
+      z-index: 8;
+      display: flex; gap: 6px;
+    }
+    .map-chip {
+      height: 29px; padding: 0 9px; border: 1px solid #cfd7dc; border-radius: 6px; background: rgba(255,255,255,.96);
+      box-shadow: 0 2px 8px rgba(20,35,45,.09); font-size: 9px; color: #4a5660; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .map-controls {
+      position: absolute;
+      right: 10px; bottom: 10px;
+      z-index: 8;
+      display: grid; gap: 5px;
+    }
+    .map-control { width: 30px; height: 30px; border: 1px solid #cfd7dc; background: #fff; border-radius: 5px; box-shadow: 0 2px 8px rgba(20,35,45,.09); color: #48545e; }
+    .map-status-card {
+      position: absolute;
+      right: 14px; top: 13px;
+      width: 274px;
+      z-index: 9;
+      background: rgba(255,255,255,.97);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      padding: 11px;
+    }
+    .driver-line { display: grid; grid-template-columns: 38px minmax(0,1fr) 25px; gap: 9px; align-items: center; }
+    .driver-photo {
+      width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg,#d8aa8b,#7e4f36); position: relative;
+      display: grid; place-items: center; color: white; font-weight: 900; font-size: 11px;
+    }
+    .driver-photo::after {
+      content: "➤"; position: absolute; right: -4px; bottom: -3px; width: 18px; height: 18px; border-radius: 50%;
+      display: grid; place-items: center; background: var(--green); border: 2px solid #fff; color: #fff; font-size: 9px; transform: rotate(-35deg);
+    }
+    .driver-name { font-size: 11px; font-weight: 800; }
+    .driver-motion { font-size: 16px; color: #6c7780; line-height: 1.2; }
+    .driver-place { margin-top: 2px; color: #8c969f; font-size: 10px; }
+    .close-card { border: 0; background: transparent; color: var(--muted-2); font-size: 16px; }
+    .driver-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--line); }
+    .driver-stat b { display: block; font-size: 11px; }
+    .driver-stat span { font-size: 8px; color: var(--muted); }
+
+    .map-svg { width: 100%; height: 100%; display: block; }
+    .road-main { fill: none; stroke: #c7ced2; stroke-width: 3; }
+    .road-minor { fill: none; stroke: #d9dee1; stroke-width: 1.2; }
+    .route { fill: none; stroke: #15a86d; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 1px rgba(0,0,0,.12)); }
+    .route-alt { fill: none; stroke: #75c9a8; stroke-width: 2.3; stroke-dasharray: 5 5; }
+    .map-label { font-size: 10px; fill: #7f8a92; font-weight: 600; }
+    .map-city { font-size: 12px; fill: #65717a; font-weight: 800; }
+    .marker-origin { fill: #fff; stroke: #d94b4b; stroke-width: 3; }
+    .marker-dest { fill: #fff; stroke: #00a66a; stroke-width: 3; }
+    .vehicle-marker { fill: #ffffff; stroke: #2778d5; stroke-width: 2; }
+    .vehicle-arrow { fill: #2778d5; }
+
+    /* metrics */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(120px,1fr));
+      gap: 8px;
+      overflow-x: auto;
+    }
+    .metric {
+      min-width: 120px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      box-shadow: var(--shadow-soft);
+    }
+    .metric-icon {
+      width: 29px; height: 29px; border-radius: 7px; display: grid; place-items: center; font-size: 12px; font-weight: 900;
+      background: #eef7f3; color: #08794f;
+    }
+    .metric b { display: block; font-size: 14px; line-height: 1; }
+    .metric span { display: block; font-size: 8px; color: var(--muted); margin-top: 4px; white-space: nowrap; }
+
+    /* data grid */
+    .grid-panel { display: flex; flex-direction: column; min-height: 0; }
+    .grid-toolbar {
+      min-height: 40px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 9px;
+    }
+    .grid-tabs { display: flex; align-items: center; gap: 4px; }
+    .grid-tab { height: 27px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 9px; font-weight: 750; padding: 0 8px; }
+    .grid-tab.active { background: var(--green-soft); color: #08794f; }
+    .grid-actions { display: flex; align-items: center; gap: 6px; }
+    .grid-actions select { height: 27px; border: 1px solid var(--line); border-radius: 5px; background: #fff; font-size: 9px; color: var(--muted); }
+    .table-wrap { overflow: auto; flex: 1; min-height: 0; }
+    table { width: 100%; border-collapse: collapse; min-width: 1060px; table-layout: fixed; }
+    thead th {
+      position: sticky; top: 0; z-index: 2;
+      height: 30px;
+      background: #f7f9fa;
+      color: #73808a;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      font-size: 7.5px;
+      font-weight: 900;
+      border-bottom: 1px solid var(--line);
+      padding: 0 8px;
+      text-align: left;
+    }
+    tbody td { height: 33px; border-bottom: 1px solid #edf0f2; padding: 0 8px; font-size: 9px; color: #4d5964; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    tbody tr:hover td { background: #f8fbfa; }
+    .linkish { color: #2879c9; font-weight: 700; }
+    .timeline-cell { padding-right: 14px; }
+    .timeline {
+      height: 14px;
+      position: relative;
+      background: linear-gradient(to right, transparent 0, transparent 9.7%, #edf0f2 10%, transparent 10.3%, transparent 19.7%, #edf0f2 20%, transparent 20.3%, transparent 29.7%, #edf0f2 30%, transparent 30.3%, transparent 39.7%, #edf0f2 40%, transparent 40.3%, transparent 49.7%, #edf0f2 50%, transparent 50.3%, transparent 59.7%, #edf0f2 60%, transparent 60.3%, transparent 69.7%, #edf0f2 70%, transparent 70.3%, transparent 79.7%, #edf0f2 80%, transparent 80.3%, transparent 89.7%, #edf0f2 90%, transparent 90.3%);
+    }
+    .tl-bar { position: absolute; top: 5px; height: 4px; border-radius: 3px; background: var(--green-2); }
+    .tl-dot { position: absolute; top: 3px; width: 8px; height: 8px; border-radius: 2px; background: var(--green); }
+    .tl-alert { background: #ef9c83; }
+    .row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+    .kebab { width: 24px; height: 24px; border: 1px solid transparent; background: transparent; border-radius: 5px; color: var(--muted); }
+    .kebab:hover { border-color: var(--line); background: #fff; }
+
+    .module-page {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .module-page.hidden { display: none; }
+
+    /* dispatch board */
+    .dispatch-content {
+      flex: 1;
+      min-height: 0;
+      padding: 10px;
+      display: grid;
+      grid-template-rows: 72px minmax(0, 1fr);
+      gap: 9px;
+      overflow: hidden;
+    }
+    .dispatch-kpis {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(130px, 1fr));
+      gap: 8px;
+      overflow-x: auto;
+    }
+    .dispatch-kpi {
+      min-width: 130px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 9px 10px;
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr);
+      gap: 9px;
+      align-items: center;
+      box-shadow: var(--shadow-soft);
+    }
+    .dispatch-kpi-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: #f0f3f5;
+      color: #69747d;
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+      font-weight: 900;
+    }
+    .dispatch-kpi b { display: block; font-size: 15px; line-height: 1; }
+    .dispatch-kpi span { display: block; font-size: 8px; color: var(--muted); margin-top: 4px; white-space: nowrap; }
+    .dispatch-kpi.critical { border-color: #efcccc; background: #fffafa; }
+    .dispatch-kpi.critical .dispatch-kpi-icon { color: #b23f3f; background: #fff0f0; }
+
+    .dispatch-layout {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 365px minmax(0, 1fr);
+      gap: 9px;
+    }
+    .dispatch-layout.full-width { grid-template-columns: 1fr; }
+    .dispatch-layout.full-width .dispatch-queue-panel { display: none; }
+    .dispatch-queue-panel,
+    .dispatch-workspace-panel { min-height: 0; display: flex; flex-direction: column; }
+    .dispatch-queue-filters {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 110px;
+      gap: 7px;
+      padding: 8px 9px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfd;
+    }
+    .dispatch-request-list { flex: 1; min-height: 0; overflow-y: auto; }
+    .dispatch-request {
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid #edf0f2;
+      background: #fff;
+      text-align: left;
+      padding: 10px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 9px;
+      transition: .12s;
+    }
+    .dispatch-request:hover { background: #f8fbfa; }
+    .dispatch-request.selected { background: #edf9f4; box-shadow: inset 3px 0 0 var(--green); }
+    .dispatch-request-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .dispatch-request-id { font-size: 10px; font-weight: 850; }
+    .dispatch-source { font-size: 8px; color: var(--muted); }
+    .dispatch-route { margin-top: 5px; font-size: 10px; color: #4d5964; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dispatch-requirements { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 5px; color: var(--muted); font-size: 8px; }
+    .dispatch-request-side { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+    .priority-chip,
+    .sla-chip,
+    .classification-chip {
+      min-height: 19px;
+      padding: 0 7px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+    .priority-chip.normal { background: #eef2f4; color: #59646e; }
+    .priority-chip.high { background: var(--amber-soft); color: #8b620e; }
+    .priority-chip.critical { background: var(--red-soft); color: #b13b3b; }
+    .sla-chip { background: #f2f5f6; color: #63707a; font-variant-numeric: tabular-nums; }
+    .sla-chip.urgent { background: #fff0f0; color: #b13b3b; }
+
+    .dispatch-workspace-head {
+      min-height: 49px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+    .dispatch-workspace-actions { display: flex; align-items: center; gap: 6px; }
+    .dispatch-workspace-content { flex: 1; min-height: 0; overflow: auto; padding: 11px; background: #fbfcfd; }
+    .dispatch-section-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .dispatch-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 11px;
+      min-width: 0;
+    }
+    .dispatch-card.full { grid-column: 1 / -1; }
+    .dispatch-card-title { font-size: 11px; font-weight: 850; margin-bottom: 8px; }
+    .dispatch-card-sub { font-size: 8px; color: var(--muted); margin-top: -5px; margin-bottom: 9px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .summary-item { border-bottom: 1px solid #edf0f2; padding: 7px 0; min-width: 0; }
+    .summary-item span { display: block; font-size: 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .summary-item b { display: block; margin-top: 3px; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .availability-row { margin: 10px 0; }
+    .availability-label { display: flex; justify-content: space-between; gap: 10px; font-size: 9px; color: #4d5964; margin-bottom: 5px; }
+    .availability-track { height: 8px; border-radius: 10px; background: #edf1f3; overflow: hidden; }
+    .availability-fill { height: 100%; border-radius: inherit; background: #7e8992; }
+    .availability-fill.good { background: var(--green); }
+    .availability-fill.warn { background: var(--amber); }
+
+    .dispatch-flow { display: grid; grid-template-columns: repeat(5, minmax(100px, 1fr)); gap: 8px; }
+    .flow-step { border: 1px solid var(--line); border-radius: 7px; padding: 9px; background: #fff; }
+    .flow-step b { display: block; font-size: 15px; }
+    .flow-step span { display: block; font-size: 8px; color: var(--muted); margin-top: 4px; }
+    .flow-step.active { border-color: #bee7d6; background: #f1fbf7; }
+
+    .route-preview {
+      position: relative;
+      height: 255px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background-color: #f1f4f5;
+      background-image: linear-gradient(#e3e7e9 1px, transparent 1px), linear-gradient(90deg, #e3e7e9 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+    .route-preview svg { width: 100%; height: 100%; display: block; }
+    .route-stop-list { display: grid; gap: 7px; }
+    .route-stop {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      padding: 8px;
+    }
+    .route-stop-index { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #eef2f4; color: #5f6b75; font-size: 9px; font-weight: 850; }
+    .route-stop b { display: block; font-size: 10px; }
+    .route-stop span { display: block; margin-top: 2px; font-size: 8px; color: var(--muted); }
+    .stop-actions { display: flex; gap: 3px; }
+    .stop-actions button { width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--muted); }
+
+    .recommendation-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .match-card { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 11px; }
+    .match-card.recommended { border-color: #bfe7d7; box-shadow: inset 3px 0 0 var(--green); }
+    .match-head { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 9px; align-items: center; }
+    .match-avatar { width: 34px; height: 34px; border-radius: 8px; background: #eef2f4; color: #5f6b75; display: grid; place-items: center; font-size: 9px; font-weight: 900; }
+    .match-name { font-size: 10px; font-weight: 850; }
+    .match-role { font-size: 8px; color: var(--muted); margin-top: 2px; }
+    .match-score { font-size: 15px; font-weight: 900; color: #08794f; }
+    .match-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 9px; }
+    .match-fact { background: #f7f9fa; border-radius: 6px; padding: 6px; }
+    .match-fact span { display: block; font-size: 7px; color: var(--muted); text-transform: uppercase; }
+    .match-fact b { display: block; font-size: 9px; margin-top: 2px; }
+
+    .constraint-list { display: grid; gap: 7px; }
+    .constraint-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 7px; background: #fff; padding: 8px; }
+    .constraint-icon { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 900; }
+    .constraint-icon.pass { background: #e9f8f1; color: #08794f; }
+    .constraint-icon.warning { background: var(--amber-soft); color: #96670c; }
+    .constraint-icon.critical { background: var(--red-soft); color: #b13b3b; }
+    .constraint-row b { display: block; font-size: 10px; }
+    .constraint-row span { display: block; margin-top: 2px; font-size: 8px; color: var(--muted); }
+    .classification-chip.pass { background: #e9f8f1; color: #08794f; }
+    .classification-chip.warning { background: var(--amber-soft); color: #96670c; }
+    .classification-chip.critical { background: var(--red-soft); color: #b13b3b; }
+
+    .assignment-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .assignment-field label { display: block; font-size: 8px; color: var(--muted); font-weight: 800; text-transform: uppercase; margin-bottom: 5px; }
+    .assignment-field select,
+    .assignment-field input,
+    .assignment-field textarea { width: 100%; border: 1px solid var(--line); border-radius: 6px; background: #fff; padding: 8px 9px; font-size: 10px; outline: none; }
+    .assignment-field textarea { min-height: 70px; resize: vertical; }
+    .assignment-field.full { grid-column: 1 / -1; }
+    .assignment-summary { margin-top: 10px; border: 1px solid #c8ebdc; background: #f1fbf7; border-radius: 8px; padding: 10px; }
+    .assignment-summary b { font-size: 10px; }
+    .assignment-summary p { margin: 4px 0 0; font-size: 8px; color: var(--muted); line-height: 1.5; }
+
+    .response-list,
+    .exception-list,
+    .audit-list { display: grid; gap: 8px; }
+    .response-row,
+    .exception-row { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 10px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+    .response-row b,
+    .exception-row b { display: block; font-size: 10px; }
+    .response-row p,
+    .exception-row p { margin: 4px 0 0; font-size: 8px; color: var(--muted); }
+    .response-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+    .response-actions { display: flex; flex-direction: column; gap: 5px; min-width: 115px; }
+    .countdown { font-size: 13px; font-weight: 900; text-align: right; font-variant-numeric: tabular-nums; }
+
+    .checklist { display: grid; gap: 7px; }
+    .check-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #edf0f2; padding: 7px 0; }
+    .check-row span { font-size: 9px; }
+    .check-status { font-size: 8px; font-weight: 850; color: #08794f; }
+    .check-status.warn { color: #96670c; }
+    .dispatch-ready-banner { border: 1px solid #bfe7d7; background: #f1fbf7; border-radius: 8px; padding: 11px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .dispatch-ready-banner b { font-size: 11px; }
+    .dispatch-ready-banner p { margin: 3px 0 0; font-size: 8px; color: var(--muted); }
+
+    .dispatch-table { width: 100%; min-width: 900px; border-collapse: collapse; table-layout: auto; }
+    .dispatch-table thead th { height: 32px; font-size: 7.5px; }
+    .dispatch-table tbody td { height: 37px; font-size: 9px; }
+    .audit-change { display: grid; grid-template-columns: minmax(90px, 1fr) 18px minmax(90px, 1fr); gap: 5px; align-items: center; }
+    .audit-value { border: 1px solid var(--line); border-radius: 5px; background: #f8fafb; padding: 5px 6px; font-size: 8px; overflow: hidden; text-overflow: ellipsis; }
+
+    /* calendar */
+    .calendar-view {
+      display: none;
+      grid-row: 1 / -1;
+      min-height: 0;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    .calendar-view.show { display: flex; flex-direction: column; }
+    .calendar-head { height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--line); }
+    .calendar-nav { display: flex; align-items: center; gap: 7px; }
+    .calendar-title { font-size: 15px; font-weight: 850; margin: 0 10px; }
+    .calendar-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(120px, 1fr)); grid-template-rows: 28px repeat(5, minmax(92px,1fr)); overflow: auto; }
+    .day-name { display: grid; place-items: center; background: #f7f9fa; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 9px; color: var(--muted); font-weight: 850; text-transform: uppercase; }
+    .day-cell { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 7px; min-width: 120px; background: #fff; }
+    .day-cell.muted { background: #fafbfc; color: #a6afb6; }
+    .day-num { font-size: 10px; font-weight: 800; margin-bottom: 6px; }
+    .cal-event { margin: 4px 0; border-left: 3px solid var(--green); border-radius: 4px; background: var(--green-soft); color: #216248; padding: 5px 6px; font-size: 8px; line-height: 1.3; }
+    .cal-event.warn { border-color: var(--amber); background: var(--amber-soft); color: #805c16; }
+    .cal-event.conflict { border-color: var(--red); background: var(--red-soft); color: #923d3d; }
+
+    /* modal */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(18,27,34,.38); z-index: 90; display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal {
+      width: min(620px, 94vw); max-height: 88vh; overflow: auto; background: #fff; border-radius: 12px; box-shadow: 0 24px 70px rgba(15,25,32,.26);
+    }
+    .modal-head { min-height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--line); }
+    .modal-head h2 { margin: 0; font-size: 15px; }
+    .modal-body { padding: 15px 16px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+    .form-field label { display: block; font-size: 9px; color: var(--muted); font-weight: 800; text-transform: uppercase; margin-bottom: 5px; }
+    .form-field input, .form-field select, .form-field textarea { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 8px 9px; font-size: 11px; outline: none; background: #fff; }
+    .form-field textarea { min-height: 75px; resize: vertical; }
+    .form-field.full { grid-column: 1 / -1; }
+    .recommendation {
+      margin-top: 13px; border: 1px solid #c8ebdc; background: #f1fbf7; border-radius: 8px; padding: 11px;
+    }
+    .recommendation strong { font-size: 11px; }
+    .recommendation p { margin: 4px 0 0; font-size: 9px; color: var(--muted); line-height: 1.5; }
+    .modal-foot { display: flex; justify-content: flex-end; gap: 7px; padding: 12px 16px; border-top: 1px solid var(--line); }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 110;
+      transform: translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      background: #1f2a32;
+      color: #fff;
+      border-radius: 8px;
+      padding: 11px 14px;
+      box-shadow: var(--shadow);
+      font-size: 11px;
+      transition: .22s;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+
+    @media (max-width: 1050px) {
+      .app { grid-template-columns: 74px minmax(0,1fr); }
+      .brand { min-width: 55px; }
+      .brand-text, .side-title, .side-search-label, .nav-item > span:not(.nav-icon):not(.nav-count) { display: none; }
+      .sidebar { padding-left: 8px; padding-right: 8px; }
+      .side-search-card { padding: 8px 6px; }
+      .side-search input { display: none; }
+      .side-shortcut { display: none; }
+      .side-search-card::before { content: "⌕"; display: grid; place-items: center; width: 100%; height: 32px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--muted); font-size: 16px; }
+      .nav-item { justify-content: center; padding: 0; }
+      .nav-count { position: absolute; margin-left: 24px; margin-top: -20px; min-width: 15px; }
+      .upper-grid { grid-template-columns: 320px minmax(0,1fr); }
+      .dispatch-layout { grid-template-columns: 320px minmax(0,1fr); }
+      .dispatch-kpis { grid-template-columns: repeat(6, minmax(120px,1fr)); }
+      .map-status-card { width: 220px; }
+    }
+    @media (max-width: 780px) {
+      body { overflow: auto; }
+      .app { display: block; height: auto; min-height: 100vh; }
+      .topbar { position: sticky; top: 0; height: 54px; }
+      .sidebar { display: none; }
+      .main { overflow: visible; }
+      .content { display: block; overflow: visible; }
+      .upper-grid { display: block; }
+      .request-panel { height: 390px; margin-bottom: 9px; }
+      .map-panel { height: 420px; margin-bottom: 9px; }
+      .metrics { margin-bottom: 9px; }
+      .grid-panel { height: 460px; }
+      .page-head { align-items: flex-start; flex-direction: column; }
+      .client-logo-wrap { justify-content: flex-start; padding-left: 0; }
+      .client-logo-card { max-width: 220px; height: 36px; }
+      .map-status-card { width: min(270px, calc(100% - 28px)); }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-field.full { grid-column: auto; }
+      .calendar-view.show { height: 700px; }
+      .dispatch-content { display: block; overflow: visible; }
+      .dispatch-kpis { margin-bottom: 9px; }
+      .dispatch-layout { display: block; }
+      .dispatch-queue-panel { height: 430px; margin-bottom: 9px; }
+      .dispatch-workspace-panel { min-height: 520px; }
+      .dispatch-section-grid, .recommendation-grid, .assignment-form { grid-template-columns: 1fr; }
+      .dispatch-card.full, .assignment-field.full { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">FT<br>MS</div>
+        <div class="brand-text"><strong>Fleet Command</strong><span>Logistics 2 Operations</span></div>
+      </div>
+      <div class="client-logo-wrap">
+        <div class="client-logo-card">
+          <img src="client-logo.png" alt="Oxford Suites Makati" />
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="live-pill"><strong id="liveTime">--:--:--</strong></div>
+        <button class="icon-btn" title="Notifications">◌</button>
+        <button class="icon-btn" title="Help">?</button>
+        <div class="avatar">AM</div>
+      </div>
+    </header>
+
+    <aside class="sidebar">
+      <div class="side-section">
+        <div class="side-search-card">
+          <div class="side-search-label">Search</div>
+          <div class="side-search">
+            <input id="globalSearch" type="search" aria-label="Search" />
+          </div>
+        </div>
+      </div>
+      <div class="side-section">
+        <div class="side-title">Main</div>
+        <button class="nav-item"><span class="nav-icon" data-icon="home"></span><span>Home</span></button>
+        <button class="nav-item"><span class="nav-icon" data-icon="map"></span><span>Live Map</span></button>
+        <button class="nav-item"><span class="nav-icon" data-icon="vehicle"></span><span>Vehicles</span></button>
+        <button class="nav-item"><span class="nav-icon" data-icon="driver"></span><span>Drivers</span></button>
+        <button class="nav-item"><span class="nav-icon" data-icon="safety"></span><span>Safety</span><span class="nav-count">4</span></button>
+        <button class="nav-item"><span class="nav-icon" data-icon="alerts"></span><span>Alerts</span><span class="nav-count">7</span></button>
+      </div>
+      <div class="side-section">
+        <div class="side-title">Jobs & Routes</div>
+        <button class="nav-item active" id="transportNav" data-module="transport"><span class="nav-icon" data-icon="requests"></span><span>Transport Requests</span><span class="nav-count">12</span></button>
+        <button class="nav-item" id="dispatchNav" data-module="dispatch"><span class="nav-icon" data-icon="dispatch"></span><span>Dispatch Board</span><span class="nav-count" id="dispatchNavCount">5</span></button>
+        <button class="nav-item"><span class="nav-icon" data-icon="route"></span><span>Route Planning</span></button>
+        <button class="nav-item"><span class="nav-icon" data-icon="calendar"></span><span>Calendar</span></button>
+      </div>
+      <div class="side-section">
+        <div class="side-title">Intelligence</div>
+        <button class="nav-item"><span class="nav-icon" data-icon="analytics"></span><span>Analytics</span></button>
+        <button class="nav-item"><span class="nav-icon" data-icon="maintenance"></span><span>Maintenance</span></button>
+        <button class="nav-item"><span class="nav-icon" data-icon="reports"></span><span>Reports</span></button>
+      </div>
+      <div class="side-section">
+        <div class="side-title">Administration</div>
+        <button class="nav-item"><span class="nav-icon" data-icon="devices"></span><span>Devices</span></button>
+        <button class="nav-item"><span class="nav-icon" data-icon="settings"></span><span>Settings</span></button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="module-page transport-module" id="transportModule">
+      <section class="page-head">
+        <div class="title-wrap">
+          <h1>Transport Requests</h1>
+        </div>
+        <div class="page-actions">
+          <button class="btn" id="dateBtn">‹ &nbsp; Today · Aug 1 2026 &nbsp; ›</button>
+          <button class="btn" id="refreshBtn">↻ Refresh</button>
+          <button class="btn" id="exportBtn">⇩ Export</button>
+          <button class="btn primary" id="newRequestBtn">＋ New request</button>
+        </div>
+      </section>
+
+      <nav class="stage-tabs" id="stageTabs"></nav>
+
+      <section class="content" id="mainContent">
+        <div class="upper-grid" id="workspace">
+          <section class="panel request-panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title" id="listTitle">Incoming requests</div>
+                <div class="panel-sub" id="listSub">Newest requests first</div>
+              </div>
+              <button class="icon-btn" style="width:27px;height:27px" title="More filters">≡</button>
+            </div>
+            <div class="filters">
+              <div class="field"><input id="requestSearch" type="search" placeholder="Search requests" /></div>
+              <div class="field">
+                <select id="statusFilter"><option value="all">All status</option></select>
+              </div>
+            </div>
+            <div class="request-list" id="requestList"></div>
+            <div class="list-footer">
+              <span id="resultCount">0 requests</span>
+              <div class="pager" id="pager"></div>
+            </div>
+          </section>
+
+          <section class="panel map-panel" id="mapPanel">
+            <div class="map-toolbar">
+              <button class="map-chip" id="mapTypeBtn">▣ Road map</button>
+              <button class="map-chip" id="trafficBtn">☷ Traffic</button>
+              <button class="map-chip" id="vehiclesBtn">▰ Vehicles</button>
+            </div>
+            <div class="map-status-card" id="driverCard">
+              <div class="driver-line">
+                <div class="driver-photo" id="driverInitial">JD</div>
+                <div>
+                  <div class="driver-name" id="driverName">Juan Dela Cruz</div>
+                  <div class="driver-motion" id="driverMotion">Moving W at 32 mph</div>
+                  <div class="driver-place" id="driverPlace">Ayala Avenue · now</div>
+                </div>
+                <button class="close-card" id="closeDriverCard">×</button>
+              </div>
+              <div class="driver-stats">
+                <div class="driver-stat"><b id="driverEta">14 min</b><span>ETA</span></div>
+                <div class="driver-stat"><b id="driverSafety">Good</b><span>Safety</span></div>
+                <div class="driver-stat"><b id="driverVehicle">VAN-04</b><span>Vehicle</span></div>
+              </div>
+            </div>
+            <div class="map-controls">
+              <button class="map-control" id="mapZoomIn" title="Zoom in">＋</button>
+              <button class="map-control" id="mapZoomOut" title="Zoom out">−</button>
+              <button class="map-control" id="mapRecenter" title="Recenter route">◎</button>
+            </div>
+            <div id="googleMap" class="google-map" aria-label="Google map showing the selected transport request"></div>
+            <div id="mapFallback" class="map-fallback">
+              <div><strong>Loading Google Maps…</strong>The map will appear when the Maps JavaScript API is available.</div>
+            </div>
+          </section>
+        </div>
+
+        <section class="metrics" id="metrics"></section>
+
+        <section class="panel grid-panel" id="gridPanel">
+          <div class="grid-toolbar">
+            <div class="grid-tabs">
+              <button class="grid-tab active">Timeline</button>
+              <button class="grid-tab">Trip details</button>
+              <button class="grid-tab">Safety</button>
+              <button class="grid-tab">Proof of service</button>
+            </div>
+            <div class="grid-actions">
+              <select><option>All priorities</option><option>High</option><option>Normal</option></select>
+              <select><option>15 rows</option><option>25 rows</option><option>50 rows</option></select>
+              <button class="btn small">Columns</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <colgroup>
+                <col style="width:90px"><col style="width:115px"><col style="width:118px"><col style="width:145px">
+                <col style="width:80px"><col style="width:75px"><col style="width:75px"><col style="width:85px"><col style="width:300px"><col style="width:55px">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Request</th><th>Requester</th><th>Vehicle</th><th>Driver</th><th>Distance</th><th>ETA</th><th>Safety</th><th>Cost</th><th>Operational timeline</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="dataTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="calendar-view" id="calendarView">
+          <div class="calendar-head">
+            <div class="calendar-nav">
+              <button class="btn small">‹</button>
+              <button class="btn small">Today</button>
+              <button class="btn small">›</button>
+              <div class="calendar-title">August 2026</div>
+            </div>
+            <div class="calendar-nav">
+              <button class="btn small primary">Month</button>
+              <button class="btn small">Week</button>
+              <button class="btn small">Day</button>
+              <button class="btn small">Conflict check</button>
+            </div>
+          </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
+        </section>
+      </section>
+      </div>
+
+      <section class="module-page dispatch-module hidden" id="dispatchModule">
+        <section class="page-head">
+          <div class="title-wrap">
+            <h1>Dispatch Board</h1>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="dispatchDateBtn">‹ &nbsp; Today · Aug 1 2026 &nbsp; ›</button>
+            <button class="btn" id="dispatchRefreshBtn">↻ Refresh</button>
+            <button class="btn" id="dispatchExportBtn">⇩ Export</button>
+            <button class="btn primary" id="openAssignmentBtn">＋ Open assignment</button>
+          </div>
+        </section>
+
+        <nav class="stage-tabs dispatch-tabs" id="dispatchTabs"></nav>
+
+        <section class="dispatch-content">
+          <section class="dispatch-kpis" id="dispatchKpis"></section>
+
+          <div class="dispatch-layout" id="dispatchLayout">
+            <section class="panel dispatch-queue-panel" id="dispatchQueuePanel">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title" id="dispatchQueueTitle">Unassigned requests</div>
+                  <div class="panel-sub" id="dispatchQueueSub">Approved requests from Transport Requests</div>
+                </div>
+                <button class="icon-btn" style="width:27px;height:27px" title="Queue filters">≡</button>
+              </div>
+              <div class="dispatch-queue-filters">
+                <div class="field"><input id="dispatchSearch" type="search" placeholder="Search queue" /></div>
+                <div class="field">
+                  <select id="dispatchPriorityFilter">
+                    <option value="all">All priority</option>
+                    <option value="Critical">Critical</option>
+                    <option value="High">High</option>
+                    <option value="Normal">Normal</option>
+                  </select>
+                </div>
+              </div>
+              <div class="dispatch-request-list" id="dispatchRequestList"></div>
+              <div class="list-footer">
+                <span id="dispatchResultCount">0 requests</span>
+                <div class="pager" id="dispatchPager"></div>
+              </div>
+            </section>
+
+            <section class="panel dispatch-workspace-panel">
+              <div class="dispatch-workspace-head">
+                <div>
+                  <div class="panel-title" id="dispatchWorkspaceTitle">Dispatch overview</div>
+                  <div class="panel-sub" id="dispatchWorkspaceSub">Assignment readiness and operational conflicts</div>
+                </div>
+                <div class="dispatch-workspace-actions" id="dispatchWorkspaceActions"></div>
+              </div>
+              <div class="dispatch-workspace-content" id="dispatchWorkspaceContent"></div>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <div class="modal-head"><h2 id="modalTitle">Create transport request</h2><button class="close-card" id="modalClose">×</button></div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-foot">
+        <button class="btn" id="modalCancel">Cancel</button>
+        <button class="btn primary" id="modalConfirm">Save request</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast">Saved successfully</div>
+
+  <script>
+    const stages = [
+      { id: 'requests', label: 'Requests', icon: 'requests', title: 'Incoming requests', sub: '' },
+      { id: 'approval', label: 'For Approval', icon: 'approval', title: 'Pending approval', sub: '' },
+      { id: 'dispatch', label: 'Dispatch Queue', icon: 'dispatch', title: 'Approved and unassigned', sub: '' },
+      { id: 'active', label: 'Active Trips', icon: 'active', title: 'Trips in progress', sub: '' },
+      { id: 'completed', label: 'Completed', icon: 'completed', title: 'Completed trips', sub: '' },
+      { id: 'calendar', label: 'Calendar View', icon: 'calendar', title: 'Scheduled requests', sub: 'Daily weekly and conflict-aware planning' }
+    ];
+
+    const people = [
+      ['Maria Santos','MS'],['Kevin Lim','KL'],['Anna Reyes','AR'],['Miguel Torres','MT'],['Sophia Cruz','SC'],['Daniel Garcia','DG'],['Lea Mendoza','LM'],['Nico Velasco','NV']
+    ];
+
+    const stageData = {
+      requests: [
+        req('TR-260801-014','Airport pickup','Maria Santos','NAIA Terminal 3','Oxford Suites Makati','09:20','new','High','Sedan','Unassigned','7.8 km','24 min','Pending','₱680'),
+        req('TR-260801-013','Guest transfer','Kevin Lim','Oxford Suites Makati','BGC High Street','09:05','new','Normal','SUV','Unassigned','5.4 km','18 min','Pending','₱430'),
+        req('TR-260801-012','Food delivery','Anna Reyes','Central Kitchen','Rockwell Event Hall','08:48','new','High','Van','Unassigned','9.2 km','29 min','Pending','₱760'),
+        req('TR-260801-011','Staff shuttle','Miguel Torres','MRT Ayala','Oxford Suites Makati','08:32','new','Normal','Van','Unassigned','3.1 km','12 min','Pending','₱280'),
+        req('TR-260801-010','Supplier pickup','Sophia Cruz','Oxford Suites Makati','Pasay Logistics Hub','08:10','new','Normal','Pickup','Unassigned','8.5 km','27 min','Pending','₱710'),
+        req('TR-260801-009','VIP transport','Daniel Garcia','Oxford Suites Makati','The Manila Hotel','07:55','new','High','Premium Sedan','Unassigned','11.7 km','35 min','Pending','₱1,120'),
+        req('TR-260801-008','Guest transfer','Lea Mendoza','Greenbelt 3','NAIA Terminal 1','07:41','new','Normal','Sedan','Unassigned','7.0 km','23 min','Pending','₱610')
+      ],
+      approval: [
+        req('TR-260801-007','VIP transport','Isabella Tan','NAIA Terminal 2','Oxford Suites Makati','07:25','pending','High','Premium Sedan','Unassigned','8.8 km','26 min','Pending','₱890'),
+        req('TR-260801-006','Banquet logistics','Marco Villanueva','Central Kitchen','Makati Diamond Hall','07:12','pending','Normal','Cargo Van','Unassigned','4.9 km','16 min','Pending','₱420'),
+        req('TR-260801-005','Staff shuttle','Rina Flores','Guadalupe Station','Oxford Suites Makati','06:58','pending','Normal','Van','Unassigned','4.1 km','15 min','Pending','₱340'),
+        req('TR-260801-004','Airport drop-off','Paolo Sy','Oxford Suites Makati','NAIA Terminal 3','06:43','pending','High','Sedan','Unassigned','7.9 km','25 min','Pending','₱690')
+      ],
+      dispatch: [
+        req('TR-260801-003','Airport pickup','Harold Ong','NAIA Terminal 3','Oxford Suites Makati','06:25','approved','High','Toyota Altis · CAR-02','Juan Dela Cruz','7.8 km','22 min','Good','₱650'),
+        req('TR-260801-002','Guest transfer','Camille Yu','Oxford Suites Makati','SM Aura','06:14','approved','Normal','Nissan Urvan · VAN-04','Roberto Diaz','5.8 km','19 min','Good','₱480'),
+        req('TR-260801-001','Supplier pickup','Ben Ramos','Pasay Logistics Hub','Oxford Suites Makati','06:02','approved','Normal','Toyota Hilux · PUP-01','Allan Cruz','8.3 km','26 min','Review','₱700')
+      ],
+      active: [
+        req('TR-260731-028','Airport pickup','Elaine Chua','NAIA Terminal 3','Oxford Suites Makati','05:55','active','High','Toyota Altis · CAR-02','Juan Dela Cruz','7.8 km','14 min','Good','₱650'),
+        req('TR-260731-027','Guest transfer','Noel Javier','Oxford Suites Makati','BGC High Street','05:34','active','Normal','Nissan Urvan · VAN-04','Roberto Diaz','5.4 km','8 min','Good','₱440'),
+        req('TR-260731-026','Food delivery','Celine Bautista','Central Kitchen','Rockwell Event Hall','05:18','active','Normal','Toyota Hiace · VAN-02','Arman Reyes','9.2 km','17 min','Caution','₱740'),
+        req('TR-260731-025','Staff shuttle','Kate Domingo','MRT Ayala','Oxford Suites Makati','05:02','active','Normal','Toyota Innova · MPV-03','Luis Martin','3.1 km','5 min','Good','₱290')
+      ],
+      completed: [
+        req('TR-260731-024','VIP transport','Sean Uy','Oxford Suites Makati','The Manila Hotel','23:20','completed','High','Premium Sedan · CAR-05','Victor Santos','11.7 km','Completed','92/100','₱1,080'),
+        req('TR-260731-023','Airport drop-off','Grace Tan','Oxford Suites Makati','NAIA Terminal 1','22:48','completed','Normal','Toyota Altis · CAR-02','Juan Dela Cruz','7.0 km','Completed','96/100','₱620'),
+        req('TR-260731-022','Banquet logistics','Ramon Lee','Central Kitchen','Makati Diamond Hall','22:10','completed','Normal','Cargo Van · CV-01','Alan Flores','4.9 km','Completed','89/100','₱410'),
+        req('TR-260731-021','Guest transfer','Ivy Co','Greenbelt 3','Oxford Suites Makati','21:44','completed','Normal','Toyota Innova · MPV-03','Luis Martin','2.2 km','Completed','94/100','₱230'),
+        req('TR-260731-020','Supplier pickup','Mark Go','Pasay Logistics Hub','Oxford Suites Makati','21:16','completed','Normal','Toyota Hilux · PUP-01','Allan Cruz','8.3 km','Completed','91/100','₱690')
+      ]
+    };
+
+    function req(id,type,requester,origin,destination,time,status,priority,vehicle,driver,distance,eta,safety,cost){
+      return { id,type,requester,origin,destination,time,status,priority,vehicle,driver,distance,eta,safety,cost,
+        details: `${type} for ${requester}`,
+        fuel: (parseFloat(distance)*0.11).toFixed(1)+' L',
+        feedback: status==='completed' ? ['Excellent','Very good','On time','Professional'][Math.floor(Math.random()*4)] : '—'
+      };
+    }
+
+    let activeModule = 'transport';
+    let currentStage = 'requests';
+    let selectedId = stageData.requests[0].id;
+    let currentPage = 1;
+    const pageSize = 5;
+    const GOOGLE_MAPS_API_KEY = '';
+    const locationCoordinates = {
+      'Oxford Suites Makati': { lat: 14.5645, lng: 121.0295 },
+      'NAIA Terminal 3': { lat: 14.5176, lng: 121.0196 },
+      'NAIA Terminal 2': { lat: 14.5097, lng: 121.0131 },
+      'NAIA Terminal 1': { lat: 14.5086, lng: 120.9926 },
+      'BGC High Street': { lat: 14.5508, lng: 121.0500 },
+      'SM Aura': { lat: 14.5465, lng: 121.0546 },
+      'Central Kitchen': { lat: 14.5547, lng: 121.0244 },
+      'Rockwell Event Hall': { lat: 14.5661, lng: 121.0360 },
+      'MRT Ayala': { lat: 14.5493, lng: 121.0276 },
+      'Pasay Logistics Hub': { lat: 14.5378, lng: 120.9947 },
+      'The Manila Hotel': { lat: 14.5827, lng: 120.9749 },
+      'Greenbelt 3': { lat: 14.5525, lng: 121.0215 },
+      'Makati Diamond Hall': { lat: 14.5517, lng: 121.0251 },
+      'Guadalupe Station': { lat: 14.5665, lng: 121.0452 },
+      'Destination to confirm': { lat: 14.5570, lng: 121.0290 }
+    };
+    let googleMap = null;
+    let originMapMarker = null;
+    let destinationMapMarker = null;
+    let vehicleMapMarker = null;
+    let routePolyline = null;
+    let trafficLayer = null;
+    let trafficVisible = false;
+    let vehiclesVisible = true;
+    let mapTypeSatellite = false;
+
+
+    const stageTabs = document.getElementById('stageTabs');
+    const requestList = document.getElementById('requestList');
+    const dataTable = document.getElementById('dataTable');
+    const metricsEl = document.getElementById('metrics');
+    const requestSearch = document.getElementById('requestSearch');
+    const globalSearch = document.getElementById('globalSearch');
+    const statusFilter = document.getElementById('statusFilter');
+    const calendarView = document.getElementById('calendarView');
+    const workspace = document.getElementById('workspace');
+    const gridPanel = document.getElementById('gridPanel');
+    const mainContent = document.getElementById('mainContent');
+
+    const iconSet = {
+      home: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 8.5 10 3.7l6.5 4.8"></path><path d="M5.7 7.9v8h8.6v-8"></path></svg>`,
+      map: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.2 7.8 3.8l4.4 1.8 4.3-1.4v10.6l-4.3 1.4-4.4-1.8-4.3 1.4z"></path><path d="M7.8 3.8v10.8"></path><path d="M12.2 5.6v10.4"></path></svg>`,
+      vehicle: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.1 11.3h11.8"></path><path d="M5.3 11.3 6.8 7.6h6.4l1.5 3.7"></path><path d="M4.8 11.3v2.3"></path><path d="M15.2 11.3v2.3"></path><circle cx="7" cy="14.4" r="1.2"></circle><circle cx="13" cy="14.4" r="1.2"></circle></svg>`,
+      driver: `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6.2" r="2.6"></circle><path d="M5.2 15.6c.8-2.3 2.8-3.6 4.8-3.6s4 1.3 4.8 3.6"></path></svg>`,
+      safety: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.6 15.2 5.7v4c0 3.2-2 5.2-5.2 6.7-3.2-1.5-5.2-3.5-5.2-6.7v-4z"></path><path d="m7.8 10.1 1.4 1.4 3-3.2"></path></svg>`,
+      alerts: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.3c-1.9 0-3.4 1.5-3.4 3.4v1.6c0 .8-.2 1.7-.7 2.4l-.9 1.4h9.9l-.9-1.4c-.5-.7-.7-1.6-.7-2.4V7.7c0-1.9-1.5-3.4-3.4-3.4Z"></path><path d="M8.5 14.9a1.7 1.7 0 0 0 3 0"></path></svg>`,
+      requests: `<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5.2" y="3.8" width="9.6" height="12.6" rx="1.7"></rect><path d="M7.8 7h4.7"></path><path d="M7.8 10.1h4.7"></path><path d="M7.8 13.2h3.2"></path></svg>`,
+      approval: `<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.6" y="4.2" width="10.8" height="11.6" rx="1.7"></rect><path d="m7.5 10.2 1.5 1.6 3.4-3.6"></path></svg>`,
+      dispatch: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.3 10h9.6"></path><path d="m10.8 6.1 3.9 3.9-3.9 3.9"></path><path d="M4.5 5.8v8.4"></path></svg>`,
+      route: `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="5.2" cy="5.2" r="1.6"></circle><circle cx="14.8" cy="14.8" r="1.6"></circle><path d="M6.8 5.2c4.1 0 1.4 6.4 5.4 6.4"></path></svg>`,
+      calendar: `<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3.8" y="5.2" width="12.4" height="10.4" rx="1.7"></rect><path d="M6.7 3.8v2.8"></path><path d="M13.3 3.8v2.8"></path><path d="M3.8 8.3h12.4"></path></svg>`,
+      analytics: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 15.5h11"></path><path d="M6.4 13.8V9.7"></path><path d="M10 13.8V6.4"></path><path d="M13.6 13.8v-2.9"></path></svg>`,
+      maintenance: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11.9 4.5a3 3 0 0 0 3.6 3.6L11 12.6l-3.5-.9-.9-3.5 4.5-4.5a3 3 0 0 0 .8.8Z"></path><path d="m7 13 1.4 1.4"></path></svg>`,
+      reports: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.9h5.4l2.6 2.6v9.6H6z"></path><path d="M11.4 3.9v2.8h2.6"></path><path d="M8 10.1h4"></path><path d="M8 12.9h4"></path></svg>`,
+      devices: `<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.4" y="4.2" width="11.2" height="8.4" rx="1.6"></rect><path d="M8.2 15.5h3.6"></path><path d="M10 12.6v2.9"></path></svg>`,
+      settings: `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.4"></circle><path d="M10 4.4v1.5"></path><path d="M10 14.1v1.5"></path><path d="m5.9 5.9 1 1"></path><path d="m13.1 13.1 1 1"></path><path d="M4.4 10h1.5"></path><path d="M14.1 10h1.5"></path><path d="m5.9 14.1 1-1"></path><path d="m13.1 6.9 1-1"></path></svg>`,
+      active: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.6v5.2l3.4 2"></path><circle cx="10" cy="10" r="6"></circle></svg>`,
+      completed: `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6"></circle><path d="m7.4 10.1 1.6 1.6 3.6-3.8"></path></svg>`
+    };
+
+    function renderIcon(name, className = 'tab-icon') {
+      return `<span class="${className}">${iconSet[name] || iconSet.requests}</span>`;
+    }
+
+    function applyNavIcons() {
+      document.querySelectorAll('.nav-icon[data-icon]').forEach(el => {
+        el.innerHTML = iconSet[el.dataset.icon] || iconSet.requests;
+      });
+    }
+
+    function startLiveTime() {
+      const target = document.getElementById('liveTime');
+      if (!target) return;
+      const update = () => {
+        const now = new Date();
+        target.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      };
+      update();
+      setInterval(update, 1000);
+    }
+
+    function stageCount(stage) {
+      if (stage.id === 'calendar') return Object.values(stageData).flat().filter(r => r.status !== 'completed').length;
+      return (stageData[stage.id] || []).length;
+    }
+
+    function renderTabs() {
+      stageTabs.innerHTML = stages.map(s => `<button class="stage-tab ${s.id===currentStage?'active':''}" data-stage="${s.id}">${renderIcon(s.icon)}<span>${s.label}</span><span class="badge">${stageCount(s)}</span></button>`).join('');
+      stageTabs.querySelectorAll('.stage-tab').forEach(btn => btn.onclick = () => {
+        currentStage = btn.dataset.stage;
+        currentPage = 1;
+        const first = (stageData[currentStage]||[])[0];
+        if(first) selectedId = first.id;
+        renderAll();
+      });
+    }
+
+    function filteredRows() {
+      const q = (requestSearch.value || globalSearch.value).trim().toLowerCase();
+      const filter = statusFilter.value;
+      return (stageData[currentStage] || []).filter(r => {
+        const hay = Object.values(r).join(' ').toLowerCase();
+        return (!q || hay.includes(q)) && (filter === 'all' || r.status === filter);
+      });
+    }
+
+    function statusLabel(status) {
+      return ({new:'New',pending:'Pending',approved:'Approved',active:'En route',completed:'Completed',rejected:'Rejected'})[status] || status;
+    }
+
+    function renderList() {
+      const stage = stages.find(s => s.id===currentStage);
+      document.getElementById('listTitle').textContent = stage.title;
+      document.getElementById('listSub').textContent = stage.sub;
+
+      const rows = filteredRows();
+      const totalPages = Math.max(1, Math.ceil(rows.length/pageSize));
+      currentPage = Math.min(currentPage,totalPages);
+      const slice = rows.slice((currentPage-1)*pageSize,currentPage*pageSize);
+      requestList.innerHTML = slice.length ? slice.map(r => {
+        const initials = r.requester.split(' ').map(n=>n[0]).slice(0,2).join('');
+        return `<button class="request-row ${r.id===selectedId?'selected':''}" data-id="${r.id}">
+          <span class="req-avatar">${initials}</span>
+          <span class="req-main">
+            <span class="req-top"><span class="req-id">${r.id}</span><span class="req-type">${r.type}</span></span>
+            <span class="req-route">${r.origin} → ${r.destination}</span>
+            <span class="req-meta"><span>${r.time}</span><span>${r.requester}</span><span>${r.distance}</span></span>
+          </span>
+          <span class="req-side"><span class="status ${r.status}">${statusLabel(r.status)}</span><span class="priority ${r.priority==='High'?'high':''}">${r.priority}</span></span>
+        </button>`;
+      }).join('') : `<div style="height:100%;display:grid;place-items:center;color:#8a959e;font-size:11px;text-align:center;padding:20px">No requests match your filters</div>`;
+      requestList.querySelectorAll('.request-row').forEach(el => el.onclick = () => { selectedId=el.dataset.id; renderList(); updateMapCard(); });
+      document.getElementById('resultCount').textContent = `${rows.length} request${rows.length===1?'':'s'}`;
+      document.getElementById('pager').innerHTML = Array.from({length:totalPages},(_,i)=>`<button class="page-btn ${i+1===currentPage?'active':''}" data-page="${i+1}">${i+1}</button>`).join('');
+      document.querySelectorAll('.page-btn').forEach(b=>b.onclick=()=>{currentPage=+b.dataset.page;renderList();});
+    }
+
+    function findSelected() {
+      return Object.values(stageData).flat().find(r=>r.id===selectedId) || stageData.requests[0];
+    }
+
+    function updateMapCard() {
+      const r = findSelected();
+      const driver = r.driver==='Unassigned' ? 'Driver not assigned' : r.driver;
+      const initials = driver==='Driver not assigned' ? '—' : driver.split(' ').map(x=>x[0]).slice(0,2).join('');
+      document.getElementById('driverInitial').textContent=initials;
+      document.getElementById('driverName').textContent=driver;
+      document.getElementById('driverMotion').textContent = r.status==='active' ? 'Moving W at 32 mph' : r.status==='completed' ? 'Trip completed' : r.status==='approved' ? 'Ready for dispatch' : 'Awaiting assignment';
+      document.getElementById('driverPlace').textContent = `${r.origin} · ${r.time}`;
+      document.getElementById('driverEta').textContent=r.eta;
+      document.getElementById('driverSafety').textContent=r.safety;
+      document.getElementById('driverVehicle').textContent=r.vehicle.split('·').pop().trim();
+      document.getElementById('driverCard').style.display='block';
+
+      updateGoogleMapRoute(r);
+    }
+
+    function coordinatesFor(name) {
+      return locationCoordinates[name] || locationCoordinates['Oxford Suites Makati'];
+    }
+
+    function createMarker(position, title, color, label) {
+      return new google.maps.Marker({
+        position,
+        map: googleMap,
+        title,
+        label: { text: label, color: '#ffffff', fontSize: '10px', fontWeight: '700' },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: color,
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+          scale: 8
+        }
+      });
+    }
+
+    function initGoogleMap() {
+      const mapElement = document.getElementById('googleMap');
+      const fallback = document.getElementById('mapFallback');
+      if (!mapElement || !window.google?.maps) return;
+
+      googleMap = new google.maps.Map(mapElement, {
+        center: locationCoordinates['Oxford Suites Makati'],
+        zoom: 13,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        zoomControl: false,
+        clickableIcons: false,
+        gestureHandling: 'greedy',
+        styles: [
+          { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] }
+        ]
+      });
+
+      trafficLayer = new google.maps.TrafficLayer();
+      fallback?.classList.add('hidden');
+      updateGoogleMapRoute(findSelected());
+      wireGoogleMapControls();
+    }
+
+    function updateGoogleMapRoute(request) {
+      if (!googleMap || !window.google?.maps || !request) return;
+
+      const origin = coordinatesFor(request.origin);
+      const destination = coordinatesFor(request.destination);
+      const seed = parseInt(request.id.slice(-3), 10) || 1;
+      const midpoint = {
+        lat: (origin.lat + destination.lat) / 2 + ((seed % 3) - 1) * 0.0012,
+        lng: (origin.lng + destination.lng) / 2 + ((seed % 5) - 2) * 0.0010
+      };
+
+      originMapMarker?.setMap(null);
+      destinationMapMarker?.setMap(null);
+      vehicleMapMarker?.setMap(null);
+      routePolyline?.setMap(null);
+
+      originMapMarker = createMarker(origin, `Pickup: ${request.origin}`, '#d94b4b', 'P');
+      destinationMapMarker = createMarker(destination, `Destination: ${request.destination}`, '#00a66a', 'D');
+      vehicleMapMarker = createMarker(midpoint, `${request.vehicle} · ${request.driver}`, '#2778d5', 'V');
+      vehicleMapMarker.setVisible(vehiclesVisible);
+
+      routePolyline = new google.maps.Polyline({
+        path: [origin, midpoint, destination],
+        geodesic: true,
+        strokeColor: '#00a66a',
+        strokeOpacity: 0.92,
+        strokeWeight: 5,
+        map: googleMap
+      });
+
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend(origin);
+      bounds.extend(destination);
+      bounds.extend(midpoint);
+      googleMap.fitBounds(bounds, 62);
+    }
+
+    function wireGoogleMapControls() {
+      const zoomIn = document.getElementById('mapZoomIn');
+      const zoomOut = document.getElementById('mapZoomOut');
+      const recenter = document.getElementById('mapRecenter');
+      const traffic = document.getElementById('trafficBtn');
+      const vehicles = document.getElementById('vehiclesBtn');
+      const mapType = document.getElementById('mapTypeBtn');
+
+      zoomIn.onclick = () => googleMap?.setZoom((googleMap.getZoom() || 13) + 1);
+      zoomOut.onclick = () => googleMap?.setZoom((googleMap.getZoom() || 13) - 1);
+      recenter.onclick = () => updateGoogleMapRoute(findSelected());
+      traffic.onclick = () => {
+        trafficVisible = !trafficVisible;
+        trafficLayer?.setMap(trafficVisible ? googleMap : null);
+        traffic.textContent = trafficVisible ? '☷ Traffic on' : '☷ Traffic';
+      };
+      vehicles.onclick = () => {
+        vehiclesVisible = !vehiclesVisible;
+        vehicleMapMarker?.setVisible(vehiclesVisible);
+        vehicles.textContent = vehiclesVisible ? '▰ Vehicles' : '▱ Vehicles off';
+      };
+      mapType.onclick = () => {
+        mapTypeSatellite = !mapTypeSatellite;
+        googleMap?.setMapTypeId(mapTypeSatellite ? 'hybrid' : 'roadmap');
+        mapType.textContent = mapTypeSatellite ? '▣ Satellite' : '▣ Road map';
+      };
+    }
+
+    function showMapLoadError(message) {
+      const fallback = document.getElementById('mapFallback');
+      if (!fallback) return;
+      fallback.classList.remove('hidden');
+      fallback.innerHTML = `<div><strong>Google Maps could not load</strong>${message}</div>`;
+    }
+
+    function loadGoogleMaps() {
+      window.gm_authFailure = () => showMapLoadError('Check the API key restrictions billing and Maps JavaScript API status.');
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&loading=async&callback=initGoogleMap&v=weekly`;
+      script.async = true;
+      script.defer = true;
+      script.onerror = () => showMapLoadError('The Google Maps script request failed. Run this page through localhost and verify the key restrictions.');
+      document.head.appendChild(script);
+    }
+
+    function renderMetrics() {
+      const all = Object.values(stageData).flat();
+      const data = [
+        ['IN', stageData.requests.length, 'Incoming today'],
+        ['✓', stageData.approval.length, 'Awaiting approval'],
+        ['DQ', stageData.dispatch.length, 'Ready to dispatch'],
+        ['→', stageData.active.length, 'Active trips'],
+        ['ETA', '14m', 'Average active ETA'],
+        ['!', all.filter(x=>x.priority==='High').length, 'High-priority items']
+      ];
+      metricsEl.innerHTML = data.map(d=>`<div class="metric"><div class="metric-icon">${d[0]}</div><div><b>${d[1]}</b><span>${d[2]}</span></div></div>`).join('');
+    }
+
+    function timelineMarkup(r,index) {
+      const seed = (parseInt(r.id.slice(-2))+index*9)%68;
+      const width = 18 + (seed%32);
+      const alert = r.safety==='Caution' || r.safety==='Review';
+      return `<div class="timeline">
+        <span class="tl-bar ${alert?'tl-alert':''}" style="left:${Math.max(1,seed)}%;width:${Math.min(width,95-seed)}%"></span>
+        <span class="tl-dot" style="left:${Math.min(93,seed+width+3)}%"></span>
+        <span class="tl-dot" style="left:${Math.max(2,seed-6)}%;opacity:.72"></span>
+      </div>`;
+    }
+
+    function renderTable() {
+      const rows = stageData[currentStage] || Object.values(stageData).flat();
+      dataTable.innerHTML = rows.map((r,i)=>`<tr>
+        <td><span class="linkish">${r.id}</span></td>
+        <td>${r.requester}</td>
+        <td>${r.vehicle}</td>
+        <td>${r.driver}</td>
+        <td>${r.distance}</td>
+        <td>${r.eta}</td>
+        <td>${r.safety}</td>
+        <td>${r.cost}</td>
+        <td class="timeline-cell">${timelineMarkup(r,i)}</td>
+        <td><div class="row-actions"><button class="kebab" data-action="${r.id}">•••</button></div></td>
+      </tr>`).join('');
+      dataTable.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>openActionModal(b.dataset.action));
+    }
+
+    function renderCalendar() {
+      const names = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const cells=[];
+      names.forEach(n=>cells.push(`<div class="day-name">${n}</div>`));
+      const days=[26,27,28,29,30,31,...Array.from({length:29},(_,i)=>i+1)];
+      const events = {
+        1:[['08:30 Airport pickup',''],['10:00 Guest transfer','warn'],['10:15 VIP transfer','conflict']],
+        2:[['09:00 Staff shuttle',''],['14:20 Supplier pickup','']],
+        3:[['07:45 Airport drop-off',''],['11:30 Banquet logistics','']],
+        4:[['08:20 Guest transfer',''],['08:30 Guest transfer','conflict']],
+        5:[['13:10 Food delivery','warn']],
+        7:[['06:30 Staff shuttle',''],['15:15 Airport pickup','']],
+        9:[['10:00 VIP transport','']],
+        11:[['12:40 Supplier pickup','warn'],['17:10 Guest transfer','']],
+        13:[['09:30 Airport pickup','']],
+        15:[['18:00 Banquet logistics','']],
+        18:[['08:00 Staff shuttle',''],['08:05 Airport pickup','conflict']],
+        21:[['14:25 Guest transfer','']],
+        24:[['09:15 VIP transport','warn']],
+        27:[['16:45 Airport drop-off','']]
+      };
+      days.slice(0,35).forEach((d,i)=>{
+        const inMonth=i>=6;
+        const eventHtml = inMonth && events[d] ? events[d].map(e=>`<div class="cal-event ${e[1]}">${e[0]}</div>`).join('') : '';
+        cells.push(`<div class="day-cell ${inMonth?'':'muted'}"><div class="day-num">${d}</div>${eventHtml}</div>`);
+      });
+      document.getElementById('calendarGrid').innerHTML=cells.join('');
+    }
+
+    function renderAll() {
+      renderTabs();
+      if(currentStage==='calendar') {
+        workspace.style.display='none'; metricsEl.style.display='none'; gridPanel.style.display='none';
+        calendarView.classList.add('show');
+        renderCalendar();
+      } else {
+        workspace.style.display='grid'; metricsEl.style.display='grid'; gridPanel.style.display='flex';
+        calendarView.classList.remove('show');
+        fillStatusFilter();
+        renderList(); renderMetrics(); renderTable(); updateMapCard();
+      }
+    }
+
+    function fillStatusFilter(){
+      const statuses=[...new Set((stageData[currentStage]||[]).map(r=>r.status))];
+      const old=statusFilter.value;
+      statusFilter.innerHTML='<option value="all">All status</option>'+statuses.map(s=>`<option value="${s}">${statusLabel(s)}</option>`).join('');
+      statusFilter.value=statuses.includes(old)?old:'all';
+    }
+
+    const dispatchTabsData = [
+      { id: 'overview', label: 'Overview', icon: 'analytics' },
+      { id: 'unassigned', label: 'Unassigned', icon: 'requests' },
+      { id: 'planning', label: 'Planning Workspace', icon: 'route' },
+      { id: 'smart', label: 'Smart Match', icon: 'driver' },
+      { id: 'constraints', label: 'Constraints', icon: 'safety' },
+      { id: 'assignment', label: 'Assignment', icon: 'dispatch' },
+      { id: 'response', label: 'Awaiting Response', icon: 'active' },
+      { id: 'ready', label: 'Ready to Dispatch', icon: 'completed' },
+      { id: 'exceptions', label: 'Exceptions', icon: 'alerts' },
+      { id: 'dispatched', label: 'Recently Dispatched', icon: 'vehicle' },
+      { id: 'audit', label: 'Audit', icon: 'reports' }
+    ];
+
+    const dispatchRequests = [
+      dispatchReq('TR-260801-003','Airport pickup','Harold Ong','NAIA Terminal 3','Oxford Suites Makati','09:30','Critical','00:08:42',2,3,'Sedan','Flight PR 421 · Meet at Bay 6','unassigned','Juan Dela Cruz','Toyota Altis · CAR-02',96,'2.1 km','1.4 km','96/100','Good','82%','Schedule overlap warning'),
+      dispatchReq('TR-260801-002','Guest transfer','Camille Yu','Oxford Suites Makati','SM Aura','10:15','High','00:21:18',4,5,'Van','Wheelchair access required','unassigned','Roberto Diaz','Nissan Urvan · VAN-04',93,'3.4 km','2.8 km','94/100','Good','76%','None'),
+      dispatchReq('TR-260801-001','Supplier pickup','Ben Ramos','Pasay Logistics Hub','Oxford Suites Makati','10:40','Normal','00:43:05',1,0,'Pickup','Cold-chain cargo · loading dock access','unassigned','Allan Cruz','Toyota Hilux · PUP-01',91,'4.8 km','3.1 km','91/100','Good','88%','Inspection due soon'),
+      dispatchReq('TR-260801-018','VIP transport','Isabella Tan','Oxford Suites Makati','The Manila Hotel','11:00','Critical','00:06:11',2,4,'Premium Sedan','Executive guest · no shared ride','unassigned','Victor Santos','Premium Sedan · CAR-05',89,'5.2 km','1.9 km','92/100','Review','69%','Driver shift conflict'),
+      dispatchReq('TR-260801-017','Banquet logistics','Marco Villanueva','Central Kitchen','Makati Diamond Hall','11:30','High','00:32:54',1,8,'Cargo Van','Fragile banquet equipment','unassigned','Alan Flores','Cargo Van · CV-01',90,'6.0 km','2.5 km','89/100','Good','74%','None'),
+      dispatchReq('TR-260801-016','Staff shuttle','Rina Flores','Guadalupe Station','Oxford Suites Makati','12:00','Normal','00:18:20',8,2,'Van','Employee shuttle route A','awaiting','Luis Martin','Toyota Innova · MPV-03',92,'2.7 km','1.6 km','94/100','Good','81%','Awaiting driver response'),
+      dispatchReq('TR-260801-015','Airport drop-off','Paolo Sy','Oxford Suites Makati','NAIA Terminal 3','12:20','High','00:11:05',3,6,'Sedan','Flight 5J 902 · terminal 3','awaiting','Juan Dela Cruz','Toyota Altis · CAR-02',95,'1.8 km','0.9 km','96/100','Good','79%','Awaiting driver response'),
+      dispatchReq('TR-260801-014','Guest transfer','Maria Santos','Oxford Suites Makati','BGC High Street','13:00','Normal','00:27:40',2,2,'SUV','Two large suitcases','awaiting','Roberto Diaz','Nissan Urvan · VAN-04',91,'3.0 km','2.0 km','94/100','Good','73%','Driver timed out once'),
+      dispatchReq('TR-260801-013','Food delivery','Anna Reyes','Central Kitchen','Rockwell Event Hall','13:20','High','Ready',1,4,'Van','Temperature-sensitive catering order','ready','Arman Reyes','Toyota Hiace · VAN-02',94,'1.1 km','0.8 km','93/100','Good','86%','None'),
+      dispatchReq('TR-260801-012','Staff shuttle','Miguel Torres','MRT Ayala','Oxford Suites Makati','13:45','Normal','Ready',6,1,'Van','Pickup at north entrance','ready','Luis Martin','Toyota Innova · MPV-03',93,'1.5 km','0.7 km','94/100','Good','84%','None'),
+      dispatchReq('TR-260801-011','Supplier pickup','Sophia Cruz','Oxford Suites Makati','Pasay Logistics Hub','14:10','High','Exception',1,0,'Pickup','Supplier document verification required','exception','Allan Cruz','Toyota Hilux · PUP-01',84,'4.0 km','3.3 km','91/100','Hold','67%','Vehicle inspection failed'),
+      dispatchReq('TR-260801-010','VIP transport','Daniel Garcia','Oxford Suites Makati','The Manila Hotel','08:50','High','Dispatched',2,3,'Premium Sedan','Priority guest arrival','dispatched','Victor Santos','Premium Sedan · CAR-05',97,'—','—','92/100','Good','71%','Handoff confirmed')
+    ];
+
+    const dispatchAudit = [
+      audit('20:48:11','Recommendation generated','TR-260801-003','System','Unassigned','CAR-02 + Juan Dela Cruz'),
+      audit('20:46:52','Conflict acknowledged','TR-260801-018','Aljohn Mariano','Driver shift conflict','Review required'),
+      audit('20:43:04','Assignment created','TR-260801-016','Aljohn Mariano','Unassigned','MPV-03 + Luis Martin'),
+      audit('20:41:39','Driver response','TR-260801-015','Juan Dela Cruz','Awaiting','Accepted'),
+      audit('20:38:17','Recommendation overridden','TR-260801-011','Aljohn Mariano','PUP-02 suggested','PUP-01 selected'),
+      audit('20:34:55','Dispatch confirmation','TR-260801-010','Aljohn Mariano','Ready','Dispatched'),
+      audit('20:28:13','Reassignment','TR-260801-014','Aljohn Mariano','Luis Martin','Roberto Diaz')
+    ];
+
+    function dispatchReq(id,type,requester,origin,destination,time,priority,sla,passengers,luggage,vehicleType,instructions,status,driver,vehicle,score,driverDistance,vehicleDistance,safety,health,fuel,conflict) {
+      return { id,type,requester,origin,destination,time,priority,sla,passengers,luggage,vehicleType,instructions,status,driver,vehicle,score,driverDistance,vehicleDistance,safety,health,fuel,conflict,
+        inspection: status === 'ready' ? 'Passed' : status === 'exception' ? 'Failed' : 'Pending',
+        fitness: status === 'ready' ? 'Declared fit' : 'Pending',
+        maintenance: health === 'Hold' ? 'Maintenance hold' : 'Cleared',
+        documents: status === 'ready' ? 'Complete' : 'Pending review',
+        response: status === 'awaiting' ? 'Awaiting response' : status === 'ready' ? 'Accepted' : '—',
+        countdown: status === 'awaiting' ? ['04:22','07:15','01:48'][Math.abs(parseInt(id.slice(-2),10))%3] : '—',
+        dispatchTime: status === 'dispatched' ? '08:42:16' : '—'
+      };
+    }
+
+    function audit(time,event,request,actor,before,after) { return { time,event,request,actor,before,after }; }
+
+    let currentDispatchTab = 'overview';
+    let selectedDispatchId = dispatchRequests.find(r => r.status === 'unassigned').id;
+    let dispatchPage = 1;
+    const dispatchPageSize = 4;
+    let stopOrder = ['Pickup','Hotel lobby verification','Destination'];
+
+    const dispatchTabCounts = () => ({
+      overview: dispatchRequests.filter(r=>r.status==='unassigned').length,
+      unassigned: dispatchRequests.filter(r=>r.status==='unassigned').length,
+      planning: dispatchRequests.filter(r=>r.status==='unassigned').length,
+      smart: dispatchRequests.filter(r=>r.status==='unassigned').length,
+      constraints: dispatchRequests.filter(r=>r.conflict!=='None').length,
+      assignment: dispatchRequests.filter(r=>r.status==='unassigned').length,
+      response: dispatchRequests.filter(r=>r.status==='awaiting').length,
+      ready: dispatchRequests.filter(r=>r.status==='ready').length,
+      exceptions: dispatchRequests.filter(r=>r.status==='exception').length,
+      dispatched: dispatchRequests.filter(r=>r.status==='dispatched').length,
+      audit: dispatchAudit.length
+    });
+
+    function initModuleNavigation() {
+      const transportNav = document.getElementById('transportNav');
+      const dispatchNav = document.getElementById('dispatchNav');
+      transportNav?.addEventListener('click', () => setActiveModule('transport'));
+      dispatchNav?.addEventListener('click', () => setActiveModule('dispatch'));
+    }
+
+    function setActiveModule(module) {
+      activeModule = module;
+      document.getElementById('transportModule')?.classList.toggle('hidden', module !== 'transport');
+      document.getElementById('dispatchModule')?.classList.toggle('hidden', module !== 'dispatch');
+      document.getElementById('transportNav')?.classList.toggle('active', module === 'transport');
+      document.getElementById('dispatchNav')?.classList.toggle('active', module === 'dispatch');
+      if (module === 'dispatch') {
+        renderDispatchBoard();
+      } else if (googleMap) {
+        setTimeout(() => {
+          google.maps.event.trigger(googleMap, 'resize');
+          updateGoogleMapRoute(findSelected());
+        }, 60);
+      }
+    }
+
+    function initDispatchBoard() {
+      document.getElementById('dispatchSearch')?.addEventListener('input', () => { dispatchPage = 1; renderDispatchQueue(); });
+      document.getElementById('dispatchPriorityFilter')?.addEventListener('change', () => { dispatchPage = 1; renderDispatchQueue(); });
+      document.getElementById('dispatchRefreshBtn')?.addEventListener('click', () => { renderDispatchBoard(); toast('Dispatch board refreshed'); });
+      document.getElementById('dispatchExportBtn')?.addEventListener('click', () => toast('Dispatch audit export prepared'));
+      document.getElementById('dispatchDateBtn')?.addEventListener('click', () => toast('Dispatch date selector opened'));
+      document.getElementById('openAssignmentBtn')?.addEventListener('click', () => {
+        currentDispatchTab = 'assignment';
+        renderDispatchBoard();
+      });
+      renderDispatchBoard();
+    }
+
+    function renderDispatchTabs() {
+      const counts = dispatchTabCounts();
+      const el = document.getElementById('dispatchTabs');
+      el.innerHTML = dispatchTabsData.map(tab => `<button class="stage-tab ${tab.id===currentDispatchTab?'active':''}" data-dispatch-tab="${tab.id}">${renderIcon(tab.icon)}<span>${tab.label}</span><span class="badge">${counts[tab.id] ?? 0}</span></button>`).join('');
+      el.querySelectorAll('[data-dispatch-tab]').forEach(btn => btn.addEventListener('click', () => {
+        currentDispatchTab = btn.dataset.dispatchTab;
+        dispatchPage = 1;
+        renderDispatchBoard();
+      }));
+      document.getElementById('dispatchNavCount').textContent = counts.unassigned;
+    }
+
+    function dispatchQueueStatusForTab() {
+      if (currentDispatchTab === 'response') return 'awaiting';
+      if (currentDispatchTab === 'ready') return 'ready';
+      if (currentDispatchTab === 'exceptions') return 'exception';
+      if (currentDispatchTab === 'dispatched') return 'dispatched';
+      return 'unassigned';
+    }
+
+    function dispatchQueueLabels() {
+      const map = {
+        response: ['Awaiting driver response','Assignment sent and pending acceptance'],
+        ready: ['Ready to dispatch','Driver and vehicle confirmations complete'],
+        exceptions: ['Exceptions and reassignment','Items requiring dispatcher intervention'],
+        dispatched: ['Recently dispatched','Latest handoffs to Active Trips']
+      };
+      return map[currentDispatchTab] || ['Unassigned requests','Approved requests from Transport Requests'];
+    }
+
+    function filteredDispatchRows() {
+      const status = dispatchQueueStatusForTab();
+      const localQ = document.getElementById('dispatchSearch')?.value || '';
+      const q = (localQ || (activeModule === 'dispatch' ? globalSearch.value : '')).trim().toLowerCase();
+      const priority = document.getElementById('dispatchPriorityFilter')?.value || 'all';
+      return dispatchRequests.filter(r => r.status === status && (priority === 'all' || r.priority === priority) && (!q || Object.values(r).join(' ').toLowerCase().includes(q)));
+    }
+
+    function renderDispatchQueue() {
+      const [title, sub] = dispatchQueueLabels();
+      document.getElementById('dispatchQueueTitle').textContent = title;
+      document.getElementById('dispatchQueueSub').textContent = sub;
+      const rows = filteredDispatchRows();
+      const pages = Math.max(1, Math.ceil(rows.length / dispatchPageSize));
+      dispatchPage = Math.min(dispatchPage, pages);
+      const slice = rows.slice((dispatchPage - 1) * dispatchPageSize, dispatchPage * dispatchPageSize);
+      const list = document.getElementById('dispatchRequestList');
+      list.innerHTML = slice.length ? slice.map(r => `<button class="dispatch-request ${r.id===selectedDispatchId?'selected':''}" data-dispatch-id="${r.id}">
+        <span>
+          <span class="dispatch-request-top"><span class="dispatch-request-id">${r.id}</span><span class="dispatch-source">Transport Requests</span></span>
+          <span class="dispatch-route">${r.origin} → ${r.destination}</span>
+          <span class="dispatch-requirements"><span>${r.time}</span><span>${r.passengers} pax</span><span>${r.luggage} luggage</span><span>${r.vehicleType}</span></span>
+        </span>
+        <span class="dispatch-request-side"><span class="priority-chip ${r.priority.toLowerCase()}">${r.priority}</span><span class="sla-chip ${r.priority==='Critical'?'urgent':''}">${r.sla}</span></span>
+      </button>`).join('') : `<div style="height:100%;display:grid;place-items:center;color:#8a959e;font-size:11px;text-align:center;padding:20px">No dispatch records match this view</div>`;
+      list.querySelectorAll('[data-dispatch-id]').forEach(btn => btn.addEventListener('click', () => {
+        selectedDispatchId = btn.dataset.dispatchId;
+        renderDispatchQueue();
+        renderDispatchWorkspace();
+      }));
+      document.getElementById('dispatchResultCount').textContent = `${rows.length} record${rows.length===1?'':'s'}`;
+      const pager = document.getElementById('dispatchPager');
+      pager.innerHTML = Array.from({length: pages}, (_,i) => `<button class="page-btn ${i+1===dispatchPage?'active':''}" data-dispatch-page="${i+1}">${i+1}</button>`).join('');
+      pager.querySelectorAll('[data-dispatch-page]').forEach(btn => btn.addEventListener('click', () => { dispatchPage = Number(btn.dataset.dispatchPage); renderDispatchQueue(); }));
+    }
+
+    function renderDispatchKpis() {
+      const counts = dispatchTabCounts();
+      const data = [
+        ['UA',counts.unassigned,'Awaiting assignment',''],
+        ['DR',counts.response,'Awaiting driver response',''],
+        ['RD',counts.ready,'Ready to dispatch',''],
+        ['!',dispatchRequests.filter(r=>r.priority==='Critical'||r.conflict.includes('conflict')).length,'Critical conflicts','critical'],
+        ['14/18','78%','Drivers available',''],
+        ['11/15','73%','Vehicles available','']
+      ];
+      document.getElementById('dispatchKpis').innerHTML = data.map(d => `<div class="dispatch-kpi ${d[3]}"><div class="dispatch-kpi-icon">${d[0]}</div><div><b>${d[1]}</b><span>${d[2]}</span></div></div>`).join('');
+    }
+
+    function selectedDispatchRequest() {
+      return dispatchRequests.find(r => r.id === selectedDispatchId) || dispatchRequests[0];
+    }
+
+    function renderDispatchBoard() {
+      renderDispatchTabs();
+      renderDispatchKpis();
+      const fullWidth = currentDispatchTab === 'audit';
+      document.getElementById('dispatchLayout').classList.toggle('full-width', fullWidth);
+      if (!fullWidth) renderDispatchQueue();
+      renderDispatchWorkspace();
+    }
+
+    function setWorkspaceHeader(title, sub, actions = '') {
+      document.getElementById('dispatchWorkspaceTitle').textContent = title;
+      document.getElementById('dispatchWorkspaceSub').textContent = sub;
+      document.getElementById('dispatchWorkspaceActions').innerHTML = actions;
+    }
+
+    function renderDispatchWorkspace() {
+      const request = selectedDispatchRequest();
+      const content = document.getElementById('dispatchWorkspaceContent');
+      if (currentDispatchTab === 'overview') {
+        setWorkspaceHeader('Dispatch overview','Assignment readiness and operational conflicts','<button class="btn small" id="overviewOpenQueue">Open queue</button>');
+        content.innerHTML = overviewTemplate();
+      } else if (currentDispatchTab === 'unassigned') {
+        setWorkspaceHeader('Request details',`${request.id} · ${request.type}`,'<button class="btn small primary" id="openPlanningBtn">Open assignment workspace</button>');
+        content.innerHTML = requestDetailsTemplate(request);
+      } else if (currentDispatchTab === 'planning') {
+        setWorkspaceHeader('Planning workspace',`${request.id} · Route and time-window planning`,'<button class="btn small" id="addStopBtn">＋ Add stop</button>');
+        content.innerHTML = planningTemplate(request);
+      } else if (currentDispatchTab === 'smart') {
+        setWorkspaceHeader('Smart match and recommendations',`${request.id} · Ranked driver and vehicle candidates`,'<button class="btn small primary" id="acceptMatchBtn">Accept recommendation</button>');
+        content.innerHTML = smartMatchTemplate(request);
+      } else if (currentDispatchTab === 'constraints') {
+        setWorkspaceHeader('Constraint validation',`${request.id} · Critical and warning checks`,'<button class="btn small" id="acknowledgeConflictsBtn">Acknowledge warnings</button>');
+        content.innerHTML = constraintsTemplate(request);
+      } else if (currentDispatchTab === 'assignment') {
+        setWorkspaceHeader('Assignment workspace',`${request.id} · Reserve resources and send to driver`,'');
+        content.innerHTML = assignmentTemplate(request);
+      } else if (currentDispatchTab === 'response') {
+        setWorkspaceHeader('Awaiting driver response','Assignment response timers and reassignment actions','');
+        content.innerHTML = responseTemplate();
+      } else if (currentDispatchTab === 'ready') {
+        setWorkspaceHeader('Ready to dispatch',`${request.id} · Final operational checklist`,'');
+        content.innerHTML = readyTemplate(request);
+      } else if (currentDispatchTab === 'exceptions') {
+        setWorkspaceHeader('Exceptions and reassignment','Operational failures and blocked assignments','');
+        content.innerHTML = exceptionTemplate();
+      } else if (currentDispatchTab === 'dispatched') {
+        setWorkspaceHeader('Recently dispatched','Completed dispatch handoffs to Active Trips','');
+        content.innerHTML = recentlyDispatchedTemplate();
+      } else {
+        setWorkspaceHeader('Dispatch activity and audit','Recommendation assignment response and dispatch history','<button class="btn small" id="auditExportBtn">Export audit</button>');
+        content.innerHTML = auditTemplate();
+      }
+      wireDispatchWorkspaceActions(request);
+    }
+
+    function overviewTemplate() {
+      const critical = dispatchRequests.filter(r => r.priority === 'Critical' || r.conflict.includes('conflict'));
+      return `<div class="dispatch-section-grid">
+        <div class="dispatch-card full">
+          <div class="dispatch-card-title">Dispatch flow</div>
+          <div class="dispatch-flow">
+            <div class="flow-step active"><b>${dispatchRequests.filter(r=>r.status==='unassigned').length}</b><span>Unassigned</span></div>
+            <div class="flow-step"><b>${dispatchRequests.filter(r=>r.status==='awaiting').length}</b><span>Awaiting response</span></div>
+            <div class="flow-step"><b>${dispatchRequests.filter(r=>r.status==='ready').length}</b><span>Ready</span></div>
+            <div class="flow-step"><b>${dispatchRequests.filter(r=>r.status==='exception').length}</b><span>Exceptions</span></div>
+            <div class="flow-step"><b>${dispatchRequests.filter(r=>r.status==='dispatched').length}</b><span>Recently dispatched</span></div>
+          </div>
+        </div>
+        <div class="dispatch-card">
+          <div class="dispatch-card-title">Driver availability</div>
+          <div class="availability-row"><div class="availability-label"><span>Available</span><b>14 of 18</b></div><div class="availability-track"><div class="availability-fill good" style="width:78%"></div></div></div>
+          <div class="availability-row"><div class="availability-label"><span>On trip</span><b>3</b></div><div class="availability-track"><div class="availability-fill" style="width:17%"></div></div></div>
+          <div class="availability-row"><div class="availability-label"><span>Unavailable</span><b>1</b></div><div class="availability-track"><div class="availability-fill warn" style="width:6%"></div></div></div>
+        </div>
+        <div class="dispatch-card">
+          <div class="dispatch-card-title">Vehicle availability</div>
+          <div class="availability-row"><div class="availability-label"><span>Available</span><b>11 of 15</b></div><div class="availability-track"><div class="availability-fill good" style="width:73%"></div></div></div>
+          <div class="availability-row"><div class="availability-label"><span>Reserved / active</span><b>3</b></div><div class="availability-track"><div class="availability-fill" style="width:20%"></div></div></div>
+          <div class="availability-row"><div class="availability-label"><span>Maintenance hold</span><b>1</b></div><div class="availability-track"><div class="availability-fill warn" style="width:7%"></div></div></div>
+        </div>
+        <div class="dispatch-card full">
+          <div class="dispatch-card-title">Critical conflicts</div>
+          <div class="constraint-list">${critical.map(r => `<div class="constraint-row"><div class="constraint-icon critical">!</div><div><b>${r.id} · ${r.type}</b><span>${r.conflict}</span></div><span class="classification-chip critical">Critical</span></div>`).join('')}</div>
+        </div>
+      </div>`;
+    }
+
+    function requestDetailsTemplate(r) {
+      return `<div class="dispatch-section-grid">
+        <div class="dispatch-card">
+          <div class="dispatch-card-title">Request details</div>
+          <div class="summary-grid">
+            <div class="summary-item"><span>Request</span><b>${r.id}</b></div><div class="summary-item"><span>Source</span><b>Transport Requests</b></div>
+            <div class="summary-item"><span>Requester</span><b>${r.requester}</b></div><div class="summary-item"><span>Schedule</span><b>${r.time}</b></div>
+            <div class="summary-item"><span>Priority</span><b>${r.priority}</b></div><div class="summary-item"><span>SLA countdown</span><b>${r.sla}</b></div>
+          </div>
+        </div>
+        <div class="dispatch-card">
+          <div class="dispatch-card-title">Passenger and vehicle requirements</div>
+          <div class="summary-grid">
+            <div class="summary-item"><span>Passengers</span><b>${r.passengers}</b></div><div class="summary-item"><span>Luggage</span><b>${r.luggage}</b></div>
+            <div class="summary-item"><span>Vehicle type</span><b>${r.vehicleType}</b></div><div class="summary-item"><span>Pickup window</span><b>${r.time}–${addMinutes(r.time,15)}</b></div>
+          </div>
+        </div>
+        <div class="dispatch-card full"><div class="dispatch-card-title">Route</div><div class="summary-grid"><div class="summary-item"><span>Pickup</span><b>${r.origin}</b></div><div class="summary-item"><span>Destination</span><b>${r.destination}</b></div></div></div>
+        <div class="dispatch-card full"><div class="dispatch-card-title">Special instructions</div><div style="font-size:10px;color:#4d5964;line-height:1.55">${r.instructions}</div></div>
+      </div>`;
+    }
+
+    function planningTemplate(r) {
+      return `<div class="dispatch-section-grid">
+        <div class="dispatch-card full">
+          <div class="dispatch-card-title">Map and route preview</div>
+          <div class="route-preview">
+            <svg viewBox="0 0 900 300" role="img" aria-label="Route preview from pickup to destination">
+              <path d="M80 235 C210 95 330 255 470 125 C605 5 720 150 825 55" fill="none" stroke="#cfd6da" stroke-width="14" stroke-linecap="round" opacity=".55"></path>
+              <path d="M80 235 C210 95 330 255 470 125 C605 5 720 150 825 55" fill="none" stroke="#00a66a" stroke-width="6" stroke-linecap="round"></path>
+              <circle cx="80" cy="235" r="12" fill="#fff" stroke="#d94b4b" stroke-width="5"></circle>
+              <circle cx="825" cy="55" r="12" fill="#fff" stroke="#00a66a" stroke-width="5"></circle>
+              <circle cx="470" cy="125" r="10" fill="#fff" stroke="#2778d5" stroke-width="4"></circle>
+              <text x="55" y="270" font-size="12" fill="#66727b">${escapeHtml(r.origin)}</text>
+              <text x="670" y="38" font-size="12" fill="#66727b">${escapeHtml(r.destination)}</text>
+            </svg>
+          </div>
+        </div>
+        <div class="dispatch-card">
+          <div class="dispatch-card-title">Stops and ordering</div>
+          <div class="route-stop-list" id="routeStopList">${stopOrder.map((stop,i)=>routeStopMarkup(stop,i)).join('')}</div>
+        </div>
+        <div class="dispatch-card">
+          <div class="dispatch-card-title">Route alternatives</div>
+          <div class="constraint-list">
+            <div class="constraint-row"><div class="constraint-icon pass">1</div><div><b>Fastest safe route</b><span>7.8 km · 24 min · arrival ${addMinutes(r.time,24)}</span></div><span class="classification-chip pass">Recommended</span></div>
+            <div class="constraint-row"><div class="constraint-icon pass">2</div><div><b>Lowest fuel route</b><span>8.4 km · 27 min · estimated 0.8 L</span></div><span class="classification-chip pass">Available</span></div>
+            <div class="constraint-row"><div class="constraint-icon warning">3</div><div><b>Avoid tolls</b><span>9.1 km · 31 min · pickup window risk</span></div><span class="classification-chip warning">Warning</span></div>
+          </div>
+        </div>
+        <div class="dispatch-card full"><div class="summary-grid"><div class="summary-item"><span>Distance</span><b>7.8 km</b></div><div class="summary-item"><span>Estimated duration</span><b>24 min</b></div><div class="summary-item"><span>Estimated pickup</span><b>${r.time}</b></div><div class="summary-item"><span>Estimated arrival</span><b>${addMinutes(r.time,24)}</b></div></div></div>
+      </div>`;
+    }
+
+    function routeStopMarkup(stop,index) {
+      return `<div class="route-stop"><div class="route-stop-index">${index+1}</div><div><b>${stop}</b><span>${index===0?'Required pickup':index===stopOrder.length-1?'Required destination':'Optional intermediate stop'}</span></div><div class="stop-actions"><button data-stop-up="${index}" title="Move up">↑</button><button data-stop-down="${index}" title="Move down">↓</button></div></div>`;
+    }
+
+    function smartMatchTemplate(r) {
+      const drivers = [
+        {name:r.driver,role:'Recommended driver',score:r.score,distance:r.driverDistance,availability:'Available',safety:r.safety,license:'Compatible'},
+        {name:'Roberto Diaz',role:'Alternative driver',score:88,distance:'3.7 km',availability:'Available in 12 min',safety:'94/100',license:'Compatible'},
+        {name:'Luis Martin',role:'Alternative driver',score:82,distance:'2.4 km',availability:'Shift ends 14:00',safety:'94/100',license:'Compatible'}
+      ];
+      const vehicles = [
+        {name:r.vehicle,role:'Recommended vehicle',score:r.score,distance:r.vehicleDistance,availability:'Available',health:r.health,fuel:r.fuel,capacity:'Compatible'},
+        {name:'Toyota Innova · MPV-03',role:'Alternative vehicle',score:87,distance:'2.6 km',availability:'Available',health:'Good',fuel:'84%',capacity:'Compatible'},
+        {name:'Nissan Urvan · VAN-04',role:'Alternative vehicle',score:80,distance:'3.2 km',availability:'Available in 18 min',health:'Good',fuel:'73%',capacity:'Exceeds need'}
+      ];
+      return `<div class="dispatch-section-grid">
+        <div class="dispatch-card full"><div class="dispatch-card-title">Recommendation explanation</div><div style="font-size:9px;line-height:1.55;color:#4d5964">The recommended pair has the highest combined readiness score based on distance to pickup capacity compatibility license and skill requirements driver safety vehicle health fuel readiness and schedule availability.</div></div>
+        <div class="dispatch-card"><div class="dispatch-card-title">Driver recommendations</div><div class="recommendation-grid" style="grid-template-columns:1fr">${drivers.map((d,i)=>driverMatchMarkup(d,i===0)).join('')}</div></div>
+        <div class="dispatch-card"><div class="dispatch-card-title">Vehicle recommendations</div><div class="recommendation-grid" style="grid-template-columns:1fr">${vehicles.map((v,i)=>vehicleMatchMarkup(v,i===0)).join('')}</div></div>
+      </div>`;
+    }
+
+    function driverMatchMarkup(d,recommended) {
+      const initials=d.name.split(' ').map(x=>x[0]).slice(0,2).join('');
+      return `<div class="match-card ${recommended?'recommended':''}"><div class="match-head"><div class="match-avatar">${initials}</div><div><div class="match-name">${d.name}</div><div class="match-role">${d.role}</div></div><div class="match-score">${d.score}</div></div><div class="match-facts"><div class="match-fact"><span>Distance</span><b>${d.distance}</b></div><div class="match-fact"><span>Availability</span><b>${d.availability}</b></div><div class="match-fact"><span>Safety score</span><b>${d.safety}</b></div><div class="match-fact"><span>License</span><b>${d.license}</b></div></div></div>`;
+    }
+
+    function vehicleMatchMarkup(v,recommended) {
+      return `<div class="match-card ${recommended?'recommended':''}"><div class="match-head"><div class="match-avatar">VH</div><div><div class="match-name">${v.name}</div><div class="match-role">${v.role}</div></div><div class="match-score">${v.score}</div></div><div class="match-facts"><div class="match-fact"><span>Distance</span><b>${v.distance}</b></div><div class="match-fact"><span>Availability</span><b>${v.availability}</b></div><div class="match-fact"><span>Health</span><b>${v.health}</b></div><div class="match-fact"><span>Fuel</span><b>${v.fuel}</b></div><div class="match-fact"><span>Capacity</span><b>${v.capacity}</b></div></div></div>`;
+    }
+
+    function constraintsTemplate(r) {
+      const constraints = [
+        ['Schedule conflict',r.conflict.includes('Schedule')?'critical':'pass',r.conflict.includes('Schedule')?r.conflict:'No overlapping assignment'],
+        ['Driver shift conflict',r.conflict.includes('shift')?'critical':'pass',r.conflict.includes('shift')?r.conflict:'Driver is within active shift'],
+        ['Vehicle trip conflict','pass','Vehicle has no overlapping trip'],
+        ['Capacity compatibility','pass',`${r.vehicleType} supports ${r.passengers} passengers and ${r.luggage} luggage`],
+        ['Maintenance hold',r.health==='Hold'?'critical':'pass',r.health==='Hold'?'Vehicle is blocked by maintenance':'Maintenance clearance available'],
+        ['Pre-trip inspection',r.conflict.includes('inspection')?'warning':'pass',r.conflict.includes('inspection')?r.conflict:'Inspection status valid'],
+        ['Driver license restriction','pass','License class is compatible'],
+        ['Driver safety restriction',parseInt(r.safety)<90?'warning':'pass',`Safety score ${r.safety}`],
+        ['Turnaround time','warning','18-minute turnaround before next scheduled assignment'],
+        ['Route time-window','pass',`Estimated arrival ${addMinutes(r.time,24)} is within service window`]
+      ];
+      return `<div class="dispatch-section-grid"><div class="dispatch-card full"><div class="dispatch-card-title">Validation results</div><div class="constraint-list">${constraints.map(c=>`<div class="constraint-row"><div class="constraint-icon ${c[1]}">${c[1]==='pass'?'✓':'!'}</div><div><b>${c[0]}</b><span>${c[2]}</span></div><span class="classification-chip ${c[1]}">${c[1]==='pass'?'Pass':c[1]==='warning'?'Warning':'Critical'}</span></div>`).join('')}</div></div></div>`;
+    }
+
+    function assignmentTemplate(r) {
+      return `<div class="dispatch-section-grid">
+        <div class="dispatch-card full">
+          <div class="dispatch-card-title">Select and reserve resources</div>
+          <div class="assignment-form">
+            <div class="assignment-field"><label>Driver</label><select id="assignmentDriver"><option>${r.driver}</option><option>Roberto Diaz</option><option>Luis Martin</option><option>Victor Santos</option></select></div>
+            <div class="assignment-field"><label>Vehicle</label><select id="assignmentVehicle"><option>${r.vehicle}</option><option>Toyota Innova · MPV-03</option><option>Nissan Urvan · VAN-04</option><option>Premium Sedan · CAR-05</option></select></div>
+            <div class="assignment-field"><label>Assignment method</label><select id="assignmentMethod"><option>Accept smart recommendation</option><option>Override recommendation</option></select></div>
+            <div class="assignment-field"><label>Reservation</label><select><option>Reserve immediately</option><option>Reserve after review</option></select></div>
+            <div class="assignment-field full" id="overrideReasonField" style="display:none"><label>Required override reason</label><textarea id="overrideReason" placeholder="Explain why the smart recommendation was overridden"></textarea></div>
+            <div class="assignment-field full"><label>Dispatcher notes</label><textarea id="dispatcherNotes" placeholder="Add instructions for the assigned driver">${r.instructions}</textarea></div>
+          </div>
+          <div class="assignment-summary"><b>Assignment summary</b><p>${r.id} · ${r.origin} to ${r.destination} · Pickup ${r.time} · Recommended pair score ${r.score}/100</p></div>
+          <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:10px"><button class="btn" id="reserveResourcesBtn">Reserve driver and vehicle</button><button class="btn primary" id="sendAssignmentBtn">Send assignment to driver</button></div>
+        </div>
+      </div>`;
+    }
+
+    function responseTemplate() {
+      const rows = dispatchRequests.filter(r=>r.status==='awaiting');
+      return `<div class="response-list">${rows.map(r=>`<div class="response-row"><div><b>${r.id} · ${r.driver}</b><p>${r.vehicle} · ${r.origin} → ${r.destination}</p><div class="response-meta"><span class="status pending">Assignment sent</span><span class="status pending">${r.response}</span><span class="priority-chip ${r.priority.toLowerCase()}">${r.priority}</span></div></div><div class="response-actions"><div class="countdown">${r.countdown}</div><button class="btn small" data-resend="${r.id}">Resend</button><button class="btn small" data-reassign="${r.id}">Reassign</button><button class="btn small primary" data-accept-driver="${r.id}">Simulate accept</button></div></div>`).join('')}</div>`;
+    }
+
+    function readyTemplate(r) {
+      const rows = dispatchRequests.filter(x=>x.status==='ready');
+      if (r.status !== 'ready' && rows[0]) { selectedDispatchId = rows[0].id; r = rows[0]; }
+      const checklist = [
+        ['Driver acceptance confirmed','Complete'],['Vehicle assignment confirmed','Complete'],['Pre-trip inspection status',r.inspection],['Driver fitness declaration',r.fitness],['Vehicle maintenance clearance',r.maintenance],['Fuel readiness',r.fuel],['Required documents',r.documents],['Pickup schedule validation','Valid'],['Final dispatcher checklist','Complete']
+      ];
+      return `<div class="dispatch-section-grid"><div class="dispatch-card"><div class="dispatch-card-title">Final dispatcher checklist</div><div class="checklist">${checklist.map(c=>`<div class="check-row"><span>${c[0]}</span><span class="check-status ${String(c[1]).includes('Pending')?'warn':''}">${c[1]}</span></div>`).join('')}</div></div><div class="dispatch-card"><div class="dispatch-card-title">Dispatch summary</div>${requestDetailsTemplate(r).replace('<div class="dispatch-section-grid">','').replace('</div>','')}<div class="dispatch-ready-banner"><div><b>Trip is ready for dispatch</b><p>All critical checks are complete and the driver is ready.</p></div><button class="btn primary" id="dispatchTripBtn">Dispatch trip</button></div></div></div>`;
+    }
+
+    function exceptionTemplate() {
+      const rows = dispatchRequests.filter(r=>r.status==='exception');
+      return `<div class="exception-list">${rows.map(r=>`<div class="exception-row"><div><b>${r.id} · ${r.type}</b><p>${r.conflict}</p><div class="response-meta"><span class="classification-chip critical">Blocked</span><span class="priority-chip ${r.priority.toLowerCase()}">${r.priority}</span><span class="status rejected">${r.health}</span></div></div><div class="response-actions"><button class="btn small" data-ack-exception="${r.id}">Acknowledge</button><button class="btn small primary" data-reassign="${r.id}">Start reassignment</button></div></div>`).join('')}</div>`;
+    }
+
+    function recentlyDispatchedTemplate() {
+      const rows = dispatchRequests.filter(r=>r.status==='dispatched');
+      return `<div class="table-wrap" style="height:100%"><table class="dispatch-table"><thead><tr><th>Request</th><th>Driver</th><th>Vehicle</th><th>Dispatch timestamp</th><th>Initial ETA</th><th>Handoff</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr><td class="linkish">${r.id}</td><td>${r.driver}</td><td>${r.vehicle}</td><td>${r.dispatchTime}</td><td>14 min</td><td><span class="status active">Active Trips</span></td><td><button class="btn small" data-open-active="${r.id}">Open in Active Trips</button></td></tr>`).join('')}</tbody></table></div>`;
+    }
+
+    function auditTemplate() {
+      return `<div class="table-wrap" style="height:100%"><table class="dispatch-table"><thead><tr><th>Time</th><th>Activity</th><th>Request</th><th>Dispatcher / actor</th><th>Before and after values</th></tr></thead><tbody>${dispatchAudit.map(a=>`<tr><td>${a.time}</td><td>${a.event}</td><td class="linkish">${a.request}</td><td>${a.actor}</td><td><div class="audit-change"><span class="audit-value">${a.before}</span><span>→</span><span class="audit-value">${a.after}</span></div></td></tr>`).join('')}</tbody></table></div>`;
+    }
+
+    function wireDispatchWorkspaceActions(r) {
+      document.getElementById('overviewOpenQueue')?.addEventListener('click', () => { currentDispatchTab='unassigned'; renderDispatchBoard(); });
+      document.getElementById('openPlanningBtn')?.addEventListener('click', () => { currentDispatchTab='planning'; renderDispatchBoard(); });
+      document.getElementById('addStopBtn')?.addEventListener('click', () => { stopOrder.splice(stopOrder.length-1,0,'Optional stop'); renderDispatchWorkspace(); toast('Intermediate stop added'); });
+      document.querySelectorAll('[data-stop-up]').forEach(btn=>btn.addEventListener('click',()=>moveStop(Number(btn.dataset.stopUp),-1)));
+      document.querySelectorAll('[data-stop-down]').forEach(btn=>btn.addEventListener('click',()=>moveStop(Number(btn.dataset.stopDown),1)));
+      document.getElementById('acceptMatchBtn')?.addEventListener('click', () => { currentDispatchTab='assignment'; renderDispatchBoard(); toast('Smart recommendation accepted'); });
+      document.getElementById('acknowledgeConflictsBtn')?.addEventListener('click', () => { dispatchAudit.unshift(audit(new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}),'Conflict acknowledged',r.id,'Aljohn Mariano',r.conflict,'Acknowledged')); toast('Warnings acknowledged'); });
+      document.getElementById('assignmentMethod')?.addEventListener('change', e => { document.getElementById('overrideReasonField').style.display = e.target.value.includes('Override') ? 'block' : 'none'; });
+      document.getElementById('reserveResourcesBtn')?.addEventListener('click', () => toast('Driver and vehicle reserved'));
+      document.getElementById('sendAssignmentBtn')?.addEventListener('click', () => sendAssignment(r));
+      document.querySelectorAll('[data-resend]').forEach(btn=>btn.addEventListener('click',()=>toast(`Assignment resent for ${btn.dataset.resend}`)));
+      document.querySelectorAll('[data-reassign]').forEach(btn=>btn.addEventListener('click',()=>reassignDispatch(btn.dataset.reassign)));
+      document.querySelectorAll('[data-accept-driver]').forEach(btn=>btn.addEventListener('click',()=>acceptDriverAssignment(btn.dataset.acceptDriver)));
+      document.querySelectorAll('[data-ack-exception]').forEach(btn=>btn.addEventListener('click',()=>toast(`Exception acknowledged for ${btn.dataset.ackException}`)));
+      document.getElementById('dispatchTripBtn')?.addEventListener('click',()=>dispatchTrip(r.id));
+      document.querySelectorAll('[data-open-active]').forEach(btn=>btn.addEventListener('click',()=>toast(`${btn.dataset.openActive} opened in Active Trips`)));
+      document.getElementById('auditExportBtn')?.addEventListener('click',()=>toast('Audit export prepared'));
+    }
+
+    function moveStop(index,direction) {
+      const next=index+direction;
+      if(next<0||next>=stopOrder.length) return;
+      [stopOrder[index],stopOrder[next]]=[stopOrder[next],stopOrder[index]];
+      renderDispatchWorkspace();
+    }
+
+    function sendAssignment(r) {
+      const method=document.getElementById('assignmentMethod')?.value||'Accept smart recommendation';
+      if(method.includes('Override') && !document.getElementById('overrideReason')?.value.trim()) { toast('Override reason is required'); return; }
+      const driver=document.getElementById('assignmentDriver')?.value||r.driver;
+      const vehicle=document.getElementById('assignmentVehicle')?.value||r.vehicle;
+      const before=r.status;
+      r.driver=driver; r.vehicle=vehicle; r.status='awaiting'; r.response='Awaiting response'; r.countdown='05:00';
+      dispatchAudit.unshift(audit(new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}),method.includes('Override')?'Recommendation overridden':'Assignment created',r.id,'Aljohn Mariano',before,`${driver} + ${vehicle}`));
+      currentDispatchTab='response';
+      renderDispatchBoard();
+      toast('Assignment sent to driver');
+    }
+
+    function acceptDriverAssignment(id) {
+      const r=dispatchRequests.find(x=>x.id===id); if(!r)return;
+      r.status='ready'; r.response='Accepted'; r.inspection='Passed'; r.fitness='Declared fit'; r.documents='Complete';
+      dispatchAudit.unshift(audit(new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}),'Driver response',r.id,r.driver,'Awaiting','Accepted'));
+      selectedDispatchId=id; currentDispatchTab='ready'; renderDispatchBoard(); toast('Driver accepted the assignment');
+    }
+
+    function reassignDispatch(id) {
+      const r=dispatchRequests.find(x=>x.id===id); if(!r)return;
+      const before=`${r.status} · ${r.driver} · ${r.vehicle}`;
+      r.status='unassigned'; r.driver='Juan Dela Cruz'; r.vehicle='Toyota Altis · CAR-02'; r.conflict='None';
+      dispatchAudit.unshift(audit(new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}),'Reassignment',r.id,'Aljohn Mariano',before,'Returned to unassigned queue'));
+      selectedDispatchId=id; currentDispatchTab='assignment'; renderDispatchBoard(); toast('Reassignment workspace opened');
+    }
+
+    function dispatchTrip(id) {
+      const r=dispatchRequests.find(x=>x.id===id); if(!r)return;
+      r.status='dispatched'; r.dispatchTime=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      dispatchAudit.unshift(audit(r.dispatchTime,'Dispatch confirmation',r.id,'Aljohn Mariano','Ready','Dispatched'));
+      selectedDispatchId=id; currentDispatchTab='dispatched'; renderDispatchBoard(); toast('Trip dispatched and handed off to Active Trips');
+    }
+
+    function addMinutes(time,minutes) {
+      const [h,m]=time.split(':').map(Number); if(Number.isNaN(h)||Number.isNaN(m)) return '—';
+      const d=new Date(2026,7,1,h,m+minutes); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+    }
+
+    function modalForm(mode,r={}) {
+      const isDispatch=mode==='dispatch';
+      const isApproval=mode==='approval';
+      const isComplete=mode==='complete';
+      if(isApproval) return `<div class="form-grid">
+        <div class="form-field"><label>Request</label><input value="${r.id}" disabled></div>
+        <div class="form-field"><label>Requester</label><input value="${r.requester}" disabled></div>
+        <div class="form-field full"><label>Route</label><input value="${r.origin} → ${r.destination}" disabled></div>
+        <div class="form-field"><label>Decision</label><select id="decision"><option>Approve</option><option>Reject</option><option>Request more details</option></select></div>
+        <div class="form-field"><label>Priority</label><select><option>${r.priority}</option><option>Normal</option><option>High</option></select></div>
+        <div class="form-field full"><label>Reviewer note</label><textarea placeholder="Enter approval decision notes"></textarea></div>
+      </div>`;
+      if(isDispatch) return `<div class="form-grid">
+        <div class="form-field"><label>Request</label><input value="${r.id}" disabled></div>
+        <div class="form-field"><label>Required vehicle</label><input value="${r.vehicle}" disabled></div>
+        <div class="form-field"><label>Assign vehicle</label><select><option>Toyota Altis · CAR-02</option><option>Nissan Urvan · VAN-04</option><option>Toyota Innova · MPV-03</option></select></div>
+        <div class="form-field"><label>Assign driver</label><select><option>Juan Dela Cruz</option><option>Roberto Diaz</option><option>Luis Martin</option></select></div>
+        <div class="form-field"><label>Dispatch time</label><input type="datetime-local" value="2026-08-01T09:30"></div>
+        <div class="form-field"><label>Route strategy</label><select><option>Fastest safe route</option><option>Lowest fuel use</option><option>Avoid tolls</option></select></div>
+      </div><div class="recommendation"><strong>Smart recommendation: CAR-02 + Juan Dela Cruz</strong><p>Closest available pair with 96 safety score and enough fuel range. Estimated pickup in 8 minutes.</p></div>`;
+      if(isComplete) return `<div class="form-grid">
+        <div class="form-field"><label>Request</label><input value="${r.id}" disabled></div>
+        <div class="form-field"><label>Completion time</label><input type="time" value="10:25"></div>
+        <div class="form-field"><label>Proof of service</label><input type="file"></div>
+        <div class="form-field"><label>Fuel consumed</label><input value="${r.fuel}"></div>
+        <div class="form-field"><label>Driver score</label><input type="number" min="0" max="100" value="95"></div>
+        <div class="form-field"><label>Guest feedback</label><select><option>Excellent</option><option>Very good</option><option>Good</option><option>Needs improvement</option></select></div>
+        <div class="form-field full"><label>Trip summary</label><textarea>Trip completed with no incident.</textarea></div>
+      </div>`;
+      return `<div class="form-grid">
+        <div class="form-field"><label>Requester name</label><input id="newRequester" placeholder="Guest or department"></div>
+        <div class="form-field"><label>Request type</label><select><option>Airport pickup</option><option>Airport drop-off</option><option>Guest transfer</option><option>Staff shuttle</option><option>Food delivery</option><option>Supplier pickup</option><option>VIP transport</option></select></div>
+        <div class="form-field"><label>Pickup location</label><input placeholder="Enter pickup address"></div>
+        <div class="form-field"><label>Destination</label><input placeholder="Enter destination"></div>
+        <div class="form-field"><label>Schedule</label><input type="datetime-local" value="2026-08-01T10:00"></div>
+        <div class="form-field"><label>Priority</label><select><option>Normal</option><option>High</option></select></div>
+        <div class="form-field"><label>Vehicle requirement</label><select><option>Sedan</option><option>SUV</option><option>Van</option><option>Pickup</option><option>Cargo Van</option></select></div>
+        <div class="form-field"><label>Passengers / load</label><input type="number" value="1" min="1"></div>
+        <div class="form-field full"><label>Special instructions</label><textarea placeholder="Flight number accessibility needs luggage count or cargo notes"></textarea></div>
+      </div>`;
+    }
+
+    function openModal(title,body,confirmText,onConfirm){
+      document.getElementById('modalTitle').textContent=title;
+      document.getElementById('modalBody').innerHTML=body;
+      const confirm=document.getElementById('modalConfirm');
+      confirm.textContent=confirmText;
+      confirm.onclick=()=>{ onConfirm && onConfirm(); closeModal(); };
+      document.getElementById('modalBackdrop').classList.add('show');
+    }
+    function closeModal(){ document.getElementById('modalBackdrop').classList.remove('show'); }
+    function toast(msg){ const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200); }
+
+    function openActionModal(id){
+      const r=Object.values(stageData).flat().find(x=>x.id===id);
+      if(!r) return;
+      if(r.status==='pending' || r.status==='new') openModal('Review transport request',modalForm('approval',r),'Submit decision',()=>toast('Approval decision saved'));
+      else if(r.status==='approved') openModal('Assign and dispatch trip',modalForm('dispatch',r),'Dispatch trip',()=>toast('Vehicle and driver dispatched'));
+      else if(r.status==='active') openModal('Complete active trip',modalForm('complete',r),'Complete trip',()=>toast('Trip marked as completed'));
+      else openModal('Completed trip summary',modalForm('complete',r),'Save changes',()=>toast('Trip record updated'));
+    }
+
+    document.getElementById('newRequestBtn').onclick=()=>openModal('Create transport request',modalForm('new'),'Save request',()=>{
+      const name=document.getElementById('newRequester')?.value || 'New Requester';
+      const id='TR-260801-'+String(stageData.requests.length+15).padStart(3,'0');
+      stageData.requests.unshift(req(id,'Guest transfer',name,'Oxford Suites Makati','Destination to confirm','Now','new','Normal','Sedan','Unassigned','—','—','Pending','—'));
+      currentStage='requests';selectedId=id;renderAll();toast('New transport request created');
+    });
+    document.getElementById('modalClose').onclick=closeModal;
+    document.getElementById('modalCancel').onclick=closeModal;
+    document.getElementById('modalBackdrop').onclick=e=>{ if(e.target.id==='modalBackdrop') closeModal(); };
+    document.getElementById('closeDriverCard').onclick=()=>document.getElementById('driverCard').style.display='none';
+    document.getElementById('refreshBtn').onclick=()=>{ renderAll();toast('Operations data refreshed'); };
+    document.getElementById('exportBtn').onclick=()=>toast('CSV export prepared');
+    document.getElementById('dateBtn').onclick=()=>toast('Date selector opened');
+    requestSearch.oninput=()=>{currentPage=1;renderList();};
+    statusFilter.onchange=()=>{currentPage=1;renderList();};
+    globalSearch.oninput=()=>{
+      if(activeModule==='dispatch'){dispatchPage=1;renderDispatchQueue();}
+      else {currentPage=1;renderList();}
+    };
+    document.addEventListener('keydown',e=>{
+      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();globalSearch.focus();}
+      if(e.key==='Escape') closeModal();
+    });
+
+    window.initGoogleMap = initGoogleMap;
+    applyNavIcons();
+    startLiveTime();
+    initModuleNavigation();
+    initDispatchBoard();
+    renderAll();
+    loadGoogleMaps();
+  </script>
+</body>
+</html>

@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap");
+
 :root {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   color: #e8f1ed;
@@ -5,16 +7,15 @@
   font-synthesis: none;
 }
 
-.app-header,.page-title,.vehicle-list article,.pagination{display:flex;align-items:center;gap:1rem;justify-content:space-between}
-.app-header{padding-bottom:1rem;border-bottom:1px solid #d9e2ec;margin-bottom:2rem;flex-wrap:wrap}
-.auth-card{max-width:32rem}.auth-card form,.vehicle-form{display:grid;gap:1rem}
-label{display:grid;gap:.35rem;font-weight:600}input,select,button,.button{font:inherit;padding:.7rem;border:1px solid #9fb3c8;border-radius:.45rem}
-button,.button{cursor:pointer;background:#155eef;color:white;text-decoration:none;border-color:#155eef}
-button:disabled{opacity:.5;cursor:not-allowed}.filters{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:1rem;align-items:end;margin:1.5rem 0}
-.vehicle-list{display:grid;gap:.75rem}.vehicle-list article{padding:1rem;border:1px solid #d9e2ec;border-radius:.65rem}.vehicle-list h2{margin:0}.vehicle-list p{margin:.3rem 0}
-.registry-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.75rem}.registry-grid div{padding:.8rem;background:#f4f7fa;border-radius:.5rem}.registry-grid dt{text-transform:capitalize;color:#52606d}.registry-grid dd{margin:.25rem 0 0;font-weight:600}
-.vehicle-form{grid-template-columns:repeat(2,minmax(0,1fr));}.vehicle-form button,.vehicle-form [role=alert]{grid-column:1/-1}
-@media(max-width:700px){.filters,.vehicle-form{grid-template-columns:1fr}.page-title,.vehicle-list article{align-items:flex-start;flex-direction:column}.vehicle-form button,.vehicle-form [role=alert]{grid-column:auto}}
+/* Fleet Command shared shell overrides the legacy centered page container. */
+.fc-shell .fc-main {
+  min-height: 0;
+  display: block;
+  place-items: initial;
+  padding: 0;
+  background: #f4f6f8;
+}
+.fc-nav-search{display:grid;gap:5px;margin:0 2px 14px;padding:9px;border:1px solid #dfe4e8;border-radius:8px;color:#6f7b86;font-size:10px;font-weight:700;text-transform:uppercase}.fc-nav-search input{width:100%;padding:7px 8px;border:1px solid #ccd3d9;border-radius:6px}@media(max-width:760px){.fc-nav-search{display:none}}
 
 * {
   box-sizing: border-box;
@@ -24,6 +25,8 @@ body {
   margin: 0;
   min-width: 320px;
 }
+
+/* Sprint 3 protected app shell */
 
 main {
   min-height: 100vh;
@@ -44,6 +47,121 @@ main {
   box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.3);
 }
 
+.app-header,
+.page-title,
+.vehicle-list article,
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.app-header {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #d9e2ec;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.auth-card {
+  max-width: 32rem;
+}
+
+.auth-card form,
+.vehicle-form {
+  display: grid;
+  gap: 1rem;
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+input,
+select,
+button,
+.button {
+  font: inherit;
+  padding: 0.7rem;
+  border: 1px solid #9fb3c8;
+  border-radius: 0.45rem;
+}
+
+button,
+.button {
+  cursor: pointer;
+  background: #155eef;
+  color: white;
+  text-decoration: none;
+  border-color: #155eef;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 1rem;
+  align-items: end;
+  margin: 1.5rem 0;
+}
+
+.vehicle-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.vehicle-list article {
+  padding: 1rem;
+  border: 1px solid #d9e2ec;
+  border-radius: 0.65rem;
+}
+
+.vehicle-list h2 {
+  margin: 0;
+}
+
+.vehicle-list p {
+  margin: 0.3rem 0;
+}
+
+.registry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+}
+
+.registry-grid div {
+  padding: 0.8rem;
+  background: #f4f7fa;
+  border-radius: 0.5rem;
+}
+
+.registry-grid dt {
+  text-transform: capitalize;
+  color: #52606d;
+}
+
+.registry-grid dd {
+  margin: 0.25rem 0 0;
+  font-weight: 600;
+}
+
+.vehicle-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.vehicle-form button,
+.vehicle-form [role="alert"] {
+  grid-column: 1 / -1;
+}
+
 .eyebrow {
   color: #6de0b2;
   font-size: 0.78rem;
@@ -58,6 +176,11 @@ h1 {
   font-size: clamp(2.2rem, 6vw, 4rem);
   line-height: 0.98;
   letter-spacing: -0.045em;
+}
+
+h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 4vw, 1.8rem);
 }
 
 .status {
@@ -109,11 +232,6 @@ h1 {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-h2 {
-  margin: 0;
-  font-size: clamp(1.35rem, 4vw, 1.8rem);
 }
 
 .pilot-card__device {
@@ -205,6 +323,301 @@ h2 {
   border-radius: 0.75rem;
 }
 
+/* Oxford Suites Fleet Command login redesign */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.oxford-login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  place-items: initial;
+  padding: 0;
+  background: #f3f4f6;
+  color: #333333;
+  font-family: Helvetica, Arial, sans-serif;
+}
+
+.oxford-login-header {
+  position: relative;
+  overflow: hidden;
+  padding: 1.25rem 2rem;
+  background: #8b181b;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.oxford-header-pattern {
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  background-image:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.14) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.14) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.12) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.12) 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+}
+
+.oxford-header-content {
+  position: relative;
+  z-index: 1;
+}
+
+.oxford-brand-line {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.oxford-brand-name {
+  max-width: none;
+  margin: 0;
+  color: #ffffff;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.8rem, 3vw, 2rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
+
+.oxford-brand-divider {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 2rem;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.oxford-brand-system {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.35rem, 2.5vw, 1.55rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
+
+.oxford-header-content p {
+  margin: 0.25rem 0 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.oxford-login-main {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+}
+
+.oxford-login-card {
+  width: min(100%, 64rem);
+  min-height: 500px;
+  display: flex;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.oxford-login-form-panel {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+}
+
+.oxford-login-title-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.oxford-login-title-row h2 {
+  margin: 0;
+  color: #333333;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.oxford-login-form {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.oxford-form-row {
+  display: flex;
+  align-items: center;
+}
+
+.oxford-form-row label {
+  width: 33.333%;
+  display: block;
+  color: #333333;
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.oxford-form-row input {
+  width: 66.667%;
+  min-height: auto;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0;
+  background: #ffffff;
+  color: #333333;
+  font-size: 0.875rem;
+}
+
+.oxford-form-row input:focus {
+  border-color: #8b181b;
+  box-shadow: 0 0 0 1px #8b181b;
+  outline: none;
+}
+
+.oxford-form-action {
+  align-items: flex-start;
+  padding-top: 1rem;
+}
+
+.oxford-form-action > span {
+  width: 33.333%;
+}
+
+.oxford-login-button {
+  width: auto;
+  min-height: auto;
+  padding: 0.55rem 2rem;
+  border: 1px solid #4a0d0f;
+  border-radius: 2px;
+  background: linear-gradient(to bottom, #8b181b, #6a1215);
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+  font-size: 0;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.oxford-login-button::after {
+  content: "LOGIN";
+  font-size: 0.875rem;
+}
+
+.oxford-login-button:disabled {
+  opacity: 0.65;
+  font-size: 0.875rem;
+}
+
+.oxford-login-button:disabled::after {
+  content: "";
+}
+
+.oxford-login-button:hover {
+  border-color: #4a0d0f;
+  background: linear-gradient(to bottom, #6a1215, #4a0d0f);
+}
+
+.oxford-login-error {
+  width: 66.667%;
+  justify-self: end;
+  margin: -0.25rem 0 0;
+  border-color: rgba(139, 24, 27, 0.28);
+  background: #fff5f5;
+  color: #8b181b;
+}
+
+.oxford-login-image {
+  position: relative;
+  width: 50%;
+  background:
+    linear-gradient(rgba(20, 20, 20, 0.08), rgba(20, 20, 20, 0.08)),
+    url("https://images.unsplash.com/photo-1551525212-a1dc18871d4a?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80");
+  background-size: cover;
+  background-position: center;
+}
+
+/* Responsive */
+
+@media (max-width: 768px) {
+  .filters,
+  .vehicle-form {
+    grid-template-columns: 1fr;
+  }
+
+  .page-title,
+  .vehicle-list article {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .vehicle-form button,
+  .vehicle-form [role="alert"] {
+    grid-column: auto;
+  }
+
+  .oxford-login-header {
+    padding: 1rem 1.25rem;
+  }
+
+  .oxford-brand-line {
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .oxford-brand-divider {
+    display: none;
+  }
+
+  .oxford-login-main {
+    padding: 1.5rem 1rem;
+  }
+
+  .oxford-login-card {
+    min-height: auto;
+    display: block;
+  }
+
+  .oxford-login-form-panel {
+    width: 100%;
+    padding: 2rem;
+  }
+
+  .oxford-login-image {
+    display: none;
+  }
+
+  .oxford-form-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .oxford-form-row label,
+  .oxford-form-row input,
+  .oxford-form-action > span,
+  .oxford-login-error {
+    width: 100%;
+  }
+}
+
 @media (max-width: 520px) {
   .pilot-card__header,
   .vehicle-identity,
@@ -223,5 +636,19 @@ h2 {
 
   .telemetry-grid__wide {
     grid-column: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .oxford-login-form-panel {
+    padding: 1.25rem;
+  }
+
+  .oxford-login-title-row {
+    margin-bottom: 1.75rem;
+  }
+
+  .oxford-login-button {
+    width: 100%;
   }
 }

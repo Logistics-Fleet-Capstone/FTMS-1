@@ -329,4 +329,9 @@ describe("Sprint 3 secure registry", () => {
     }
     expect(await screen.findByRole("heading", { name: "Vehicle B" })).toBeInTheDocument();
   });
+  test("serves the approved operations prototype as a protected full-screen iframe route", () => {
+    renderAt("/transport-requests");
+    expect(screen.getByTitle("FTMS Operations Prototype")).toHaveAttribute("src", "/operations-ui/index.html");
+    expect(screen.queryByText("FTMS Vehicle Registry")).not.toBeInTheDocument();
+  });
 });
