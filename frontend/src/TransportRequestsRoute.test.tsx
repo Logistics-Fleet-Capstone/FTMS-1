@@ -25,6 +25,21 @@ beforeEach(() => {
   auth.user = { id: 1, username: "manager", display_name: "Fleet Manager", role: "FLEET_MANAGER" };
   auth.loading = false;
   vi.restoreAllMocks();
+  vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
+    if (init?.method !== "POST") return new Promise(() => undefined);
+    const body = init.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+    return Promise.resolve(new Response(JSON.stringify({
+      request_number: "TR-260803-9999", request_type: body.request_type ?? "GUEST_TRANSFER",
+      requester_name: body.requester_name ?? "Test Requester", requester_contact: "",
+      source_system: "MANUAL", external_reference: "", pickup_address: body.pickup_address ?? "Oxford Suites",
+      pickup_location: null, destination_address: body.destination_address ?? "NAIA",
+      destination_location: null, scheduled_at: body.scheduled_at ?? new Date().toISOString(),
+      priority: body.priority ?? "NORMAL", passenger_count: body.passenger_count ?? null,
+      load_description: "", required_vehicle_type: body.required_vehicle_type ?? "",
+      special_instructions: body.special_instructions ?? "", status: "SUBMITTED",
+      created_by: "manager", created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  });
 });
 
 describe("Transport Requests pilot workspace", () => {
@@ -40,7 +55,7 @@ describe("Transport Requests pilot workspace", () => {
     expect(document.querySelectorAll("script[data-ftms-google-maps]")).toHaveLength(0);
   });
 
-  test("creates a request and preserves passenger/load and instructions", () => {
+  test("creates a request and preserves passenger/load and instructions", async () => {
     vi.spyOn(Date, "now").mockReturnValue(1_234_567_890);
     renderRoute();
     fireEvent.click(screen.getByText("New request"));
@@ -50,7 +65,7 @@ describe("Transport Requests pilot workspace", () => {
     fireEvent.change(screen.getByLabelText("Passengers / load"), { target: { value: "7" } });
     fireEvent.change(screen.getByLabelText("Special instructions"), { target: { value: "Meet at lobby" } });
     fireEvent.click(screen.getByText("Save request"));
-    expect(screen.getByText("Test Requester")).toBeInTheDocument();
+    expect(await screen.findByText("Test Requester")).toBeInTheDocument();
     expect(screen.getByText("Passengers / load: 7")).toBeInTheDocument();
     expect(screen.getByText("Instructions: Meet at lobby")).toBeInTheDocument();
   });
@@ -60,20 +75,20 @@ describe("Transport Requests pilot workspace", () => {
     const send = screen.getByText("Send for approval");
     fireEvent.click(send);
     fireEvent.click(send);
-    expect(screen.getByText("Request sent for approval")).toBeInTheDocument();
+    expect(await screen.findByText("Request sent for approval")).toBeInTheDocument();
     expect(screen.getAllByText("TR-260801-014")).toHaveLength(2);
     await act(async () => { await Promise.resolve(); });
     fireEvent.click(screen.getByText("Approve request"));
-    expect(screen.getByText("Request approved")).toBeInTheDocument();
+    expect(await screen.findByText("Request approved")).toBeInTheDocument();
   });
 
-  test("retains rejected identity, status, reason, actor data and timestamp", () => {
+  test("retains rejected identity, status, reason, actor data and timestamp", async () => {
     vi.spyOn(window, "prompt").mockReturnValue("Capacity unavailable");
     renderRoute();
     fireEvent.click(screen.getByText("For Approval"));
-    const requestId = screen.getAllByText("TR-260801-007")[0];
     fireEvent.click(screen.getByText("Reject"));
-    expect(requestId).toBeInTheDocument();
+    expect(await screen.findByText("Request rejected and retained in Requests")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Requests"));
     fireEvent.click(screen.getAllByText("TR-260801-007")[0]);
     expect(screen.getByText("Rejected: Capacity unavailable")).toBeInTheDocument();
     expect(screen.getByText(/Rejected by Fleet Manager at/)).toBeInTheDocument();
