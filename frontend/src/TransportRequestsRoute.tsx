@@ -25,6 +25,11 @@ type TransportRequest = {
   cost: string;
   originPoint: LatLng;
   destinationPoint: LatLng;
+  passengerOrLoad: string;
+  specialInstructions: string;
+  rejectionReason?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
 };
 
 type StageData = Record<Exclude<StageId, "calendar">, TransportRequest[]>;
@@ -92,8 +97,8 @@ const places = {
   guadalupe: { lat: 14.5668, lng: 121.0453 },
 };
 
-function request(id: string, type: string, requester: string, origin: string, destination: string, scheduledTime: string, status: RequestStatus, priority: "High" | "Normal", vehicle: string, driver: string, distance: string, eta: string, safety: string, cost: string, originPoint: LatLng, destinationPoint: LatLng): TransportRequest {
-  return { id, type, requester, origin, destination, scheduledTime, status, priority, vehicle, driver, distance, eta, safety, cost, originPoint, destinationPoint };
+function request(id: string, type: string, requester: string, origin: string, destination: string, scheduledTime: string, status: RequestStatus, priority: "High" | "Normal", vehicle: string, driver: string, distance: string, eta: string, safety: string, cost: string, originPoint: LatLng, destinationPoint: LatLng, passengerOrLoad = "—", specialInstructions = ""): TransportRequest {
+  return { id, type, requester, origin, destination, scheduledTime, status, priority, vehicle, driver, distance, eta, safety, cost, originPoint, destinationPoint, passengerOrLoad, specialInstructions };
 }
 
 const initialStageData: StageData = {
@@ -161,13 +166,12 @@ function statusLabel(status: RequestStatus) {
 
 function GoogleMapCanvas({ trip }: { trip: TransportRequest }) {
   const mapElement = useRef<HTMLDivElement | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "missing-key" | "error">("loading");
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim();
+  const [state, setState] = useState<"loading" | "ready" | "missing-key" | "error">(
+    apiKey ? "loading" : "missing-key",
+  );
   useEffect(() => {
-    if (!apiKey) {
-      setState("missing-key");
-      return;
-    }
+    if (!apiKey) return;
     let active = true;
     let objects: GoogleMapObject[] = [];
     loadGoogleMaps(apiKey).then((google) => {
@@ -227,6 +231,7 @@ export default function TransportRequestsRoute() {
   const [modal, setModal] = useState<"new" | "details" | null>(null);
   const [toast, setToast] = useState("");
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const actionInFlight = useRef(false);
   const pageSize = 5;
 
   useEffect(() => {
@@ -261,7 +266,7 @@ export default function TransportRequestsRoute() {
   };
 
   const advanceSelected = () => {
-    if (currentStage === "calendar" || !selected) return;
+    if (currentStage === "calendar" || !selected || actionInFlight.current) return;
     const sourceStage = currentStage;
     const transitions: Partial<Record<Exclude<StageId, "calendar">, { target: Exclude<StageId, "calendar">; status: RequestStatus; label: string }>> = {
       requests: { target: "approval", status: "pending", label: "Request sent for approval" },
@@ -274,22 +279,28 @@ export default function TransportRequestsRoute() {
       setModal("details");
       return;
     }
+    actionInFlight.current = true;
     setStageData((previous) => ({ ...previous, [sourceStage]: previous[sourceStage].filter((item) => item.id !== selected.id), [transition.target]: [{ ...selected, status: transition.status }, ...previous[transition.target]] }));
     setToast(transition.label);
     switchStage(transition.target);
+    queueMicrotask(() => { actionInFlight.current = false; });
   };
 
   const rejectSelected = () => {
-    if (currentStage !== "approval") return;
-    const next = stageData.approval.find((item) => item.id !== selected.id);
-    setStageData((previous) => ({ ...previous, approval: previous.approval.filter((item) => item.id !== selected.id) }));
+    if (currentStage !== "approval" || selected.status !== "pending" || actionInFlight.current) return;
+    const rejectionReason = window.prompt("Rejection reason");
+    if (!rejectionReason?.trim()) return;
+    actionInFlight.current = true;
+    const next = stageData.approval.find((item) => item.id !== selected.id && item.status === "pending");
+    setStageData((previous) => ({ ...previous, approval: previous.approval.map((item) => item.id === selected.id ? { ...item, status: "rejected", rejectionReason: rejectionReason.trim(), rejectedBy: user.display_name, rejectedAt: new Date().toISOString() } : item) }));
     if (next) setSelectedId(next.id);
     setToast("Request rejected");
+    queueMicrotask(() => { actionInFlight.current = false; });
   };
 
   const createRequest = (form: HTMLFormElement) => {
     const data = new FormData(form);
-    const created = request(`TR-${String(Date.now()).slice(-9)}`, String(data.get("type") || "Guest transfer"), String(data.get("requester") || "New requester"), String(data.get("origin") || "Oxford Suites Makati"), String(data.get("destination") || "Destination to confirm"), String(data.get("time") || "Now"), "new", String(data.get("priority")) === "High" ? "High" : "Normal", String(data.get("vehicle") || "Sedan"), "Unassigned", "—", "—", "Pending", "—", places.oxford, places.bgc);
+    const created = request(`TR-${String(Date.now()).slice(-9)}`, String(data.get("type") || "Guest transfer"), String(data.get("requester") || "New requester"), String(data.get("origin") || "Oxford Suites Makati"), String(data.get("destination") || "Destination to confirm"), String(data.get("time") || "Now"), "new", String(data.get("priority")) === "High" ? "High" : "Normal", String(data.get("vehicle") || "Sedan"), "Unassigned", "—", "—", "Pending", "—", places.oxford, places.bgc, String(data.get("load") || ""), String(data.get("notes") || ""));
     setStageData((previous) => ({ ...previous, requests: [created, ...previous.requests] }));
     setCurrentStage("requests");
     setSelectedId(created.id);
@@ -326,7 +337,7 @@ export default function TransportRequestsRoute() {
       <nav className="tr-stage-tabs" aria-label="Transport request stages">{stages.map((stage) => <button key={stage.id} type="button" className={stage.id === currentStage ? "is-active" : ""} onClick={() => switchStage(stage.id)}><Icon name={stage.icon} /><span>{stage.label}</span><small>{stage.id === "calendar" ? allTrips.filter((item) => item.status !== "completed").length : stageData[stage.id].length}</small></button>)}</nav>
       {currentStage === "calendar" ? <CalendarView /> : <section className="tr-workspace"><div className="tr-upper-grid">
         <section className="tr-panel tr-request-panel"><div className="tr-panel-head"><strong>{currentStage === "requests" ? "Incoming requests" : currentStage === "approval" ? "Pending approval" : currentStage === "dispatch" ? "Approved and unassigned" : currentStage === "active" ? "Trips in progress" : "Completed trips"}</strong></div><div className="tr-list-filters"><div><Icon name="search" /><input aria-label="Search current stage" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></div><select aria-label="Filter status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}><option value="all">All status</option>{Array.from(new Set(rows.map((item) => item.status))).map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></div><div className="tr-request-list">{visibleRows.length ? visibleRows.map((item) => <button type="button" key={item.id} className={item.id === selected.id ? "is-selected" : ""} onClick={() => setSelectedId(item.id)}><span className="tr-initials">{item.requester.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><span className="tr-request-main"><strong>{item.id}</strong><small>{item.type}</small><em>{item.origin} → {item.destination}</em><i>{item.scheduledTime} · {item.requester} · {item.distance}</i></span><span className="tr-request-side"><b className={`is-${item.status}`}>{statusLabel(item.status)}</b><small className={item.priority === "High" ? "is-high" : ""}>{item.priority}</small></span></button>) : <div className="tr-empty">No requests match your filters.</div>}</div><div className="tr-list-footer"><span>{filteredRows.length} request{filteredRows.length === 1 ? "" : "s"}</span><div>{Array.from({ length: totalPages }, (_, index) => <button key={index + 1} type="button" className={safePage === index + 1 ? "is-active" : ""} onClick={() => setPage(index + 1)}>{index + 1}</button>)}</div></div></section>
-        <section className="tr-panel tr-map-panel"><GoogleMapCanvas trip={selected} /><div className="tr-map-card"><div className="tr-driver-row"><span className="tr-driver-avatar">{selected.driver === "Unassigned" ? "—" : selected.driver.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><div><strong>{selected.driver === "Unassigned" ? "Driver not assigned" : selected.driver}</strong><span>{selected.status === "active" ? "Moving W at 32 mph" : selected.status === "completed" ? "Trip completed" : selected.status === "approved" ? "Ready for dispatch" : "Awaiting assignment"}</span><small>{selected.origin} · {selected.scheduledTime}</small></div></div><div className="tr-driver-stats"><span><b>{selected.eta}</b><small>ETA</small></span><span><b>{selected.safety}</b><small>Safety</small></span><span><b>{selected.vehicle.split("·").pop()?.trim()}</b><small>Vehicle</small></span></div><div className="tr-map-actions"><button type="button" className="is-primary" onClick={advanceSelected}>{actionLabel}</button>{currentStage === "approval" && <><button type="button" onClick={() => setToast("More details requested")}>Request details</button><button type="button" className="is-danger" onClick={rejectSelected}>Reject</button></>}</div></div></section>
+        <section className="tr-panel tr-map-panel"><GoogleMapCanvas trip={selected} /><div className="tr-map-card"><div className="tr-driver-row"><span className="tr-driver-avatar">{selected.driver === "Unassigned" ? "—" : selected.driver.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><div><strong>{selected.driver === "Unassigned" ? "Driver not assigned" : selected.driver}</strong><span>{selected.status === "active" ? "Moving W at 32 mph" : selected.status === "completed" ? "Trip completed" : selected.status === "approved" ? "Ready for dispatch" : selected.status === "rejected" ? `Rejected: ${selected.rejectionReason}` : "Awaiting assignment"}</span>{selected.status === "rejected" && <small>Rejected by {selected.rejectedBy} at {selected.rejectedAt}</small>}<small>{selected.origin} · {selected.scheduledTime}</small><small>Passengers / load: {selected.passengerOrLoad || "—"}</small>{selected.specialInstructions && <small>Instructions: {selected.specialInstructions}</small>}</div></div><div className="tr-driver-stats"><span><b>{selected.eta}</b><small>ETA</small></span><span><b>{selected.safety}</b><small>Safety</small></span><span><b>{selected.vehicle.split("·").pop()?.trim()}</b><small>Vehicle</small></span></div><div className="tr-map-actions">{selected.status !== "rejected" && <button type="button" className="is-primary" onClick={advanceSelected}>{actionLabel}</button>}{currentStage === "approval" && selected.status === "pending" && <><button type="button" onClick={() => setToast("More details requested")}>Request details</button><button type="button" className="is-danger" onClick={rejectSelected}>Reject</button></>}</div></div></section>
       </div>
       <section className="tr-metrics"><article><span><Icon name="requests" /></span><div><strong>{stageData.requests.length}</strong><small>Incoming today</small></div></article><article><span><Icon name="approval" /></span><div><strong>{stageData.approval.length}</strong><small>Awaiting approval</small></div></article><article><span><Icon name="dispatch" /></span><div><strong>{stageData.dispatch.length}</strong><small>Ready to dispatch</small></div></article><article><span><Icon name="active" /></span><div><strong>{stageData.active.length}</strong><small>Active trips</small></div></article><article><span>ETA</span><div><strong>14m</strong><small>Average active ETA</small></div></article><article><span>!</span><div><strong>{allTrips.filter((item) => item.priority === "High").length}</strong><small>High-priority items</small></div></article></section>
       <section className="tr-panel tr-table-panel"><div className="tr-table-toolbar"><div><button type="button" className="is-active">Timeline</button><button type="button">Trip details</button><button type="button">Safety</button><button type="button">Proof of service</button></div><div><select aria-label="Priority"><option>All priorities</option><option>High</option><option>Normal</option></select><button type="button">Columns</button></div></div><div className="tr-table-scroll"><table><thead><tr><th>Request</th><th>Requester</th><th>Vehicle</th><th>Driver</th><th>Distance</th><th>ETA</th><th>Safety</th><th>Cost</th><th>Operational timeline</th></tr></thead><tbody>{rows.map((item, index) => <tr key={item.id}><td>{item.id}</td><td>{item.requester}</td><td>{item.vehicle}</td><td>{item.driver}</td><td>{item.distance}</td><td>{item.eta}</td><td>{item.safety}</td><td>{item.cost}</td><td><div className="tr-timeline"><span style={{ left: `${8 + (index * 13) % 50}%`, width: `${24 + (index * 7) % 28}%` }} /><i style={{ left: `${38 + (index * 17) % 48}%` }} /></div></td></tr>)}</tbody></table></div></section></section>}
