@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Redirect, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import { ApiError } from "./services/api";
+import { createTransportRequest, getTransportRequests, transportRequestAction, type ApiTransportRequest } from "./services/transportRequests";
 import "./transport-requests.css";
 
 type StageId = "requests" | "approval" | "dispatch" | "active" | "completed" | "calendar";
@@ -164,6 +166,17 @@ function statusLabel(status: RequestStatus) {
   return ({ new: "New", pending: "Pending", approved: "Approved", active: "En route", completed: "Completed", rejected: "Rejected" } as const)[status];
 }
 
+function fromApi(item: ApiTransportRequest): TransportRequest {
+  const status: RequestStatus = item.status === "APPROVED" ? "approved" : item.status === "PENDING_APPROVAL" || item.status === "MORE_DETAILS_REQUIRED" ? "pending" : item.status === "REJECTED" ? "rejected" : "new";
+  const originPoint = item.pickup_location ? { lat: item.pickup_location.latitude, lng: item.pickup_location.longitude } : places.oxford;
+  const destinationPoint = item.destination_location ? { lat: item.destination_location.latitude, lng: item.destination_location.longitude } : places.bgc;
+  return request(item.request_number, item.request_type.replaceAll("_", " ").toLowerCase(), item.requester_name, item.pickup_address, item.destination_address, new Date(item.scheduled_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }), status, item.priority === "HIGH" ? "High" : "Normal", item.required_vehicle_type || "Unspecified", "Unassigned", "—", "—", "Pending", "—", originPoint, destinationPoint, item.passenger_count?.toString() || item.load_description || "—", item.special_instructions);
+}
+
+function requestTypeValue(label: string) {
+  return label.trim().toUpperCase().replaceAll(/[^A-Z0-9]+/g, "_");
+}
+
 function GoogleMapCanvas({ trip }: { trip: TransportRequest }) {
   const mapElement = useRef<HTMLDivElement | null>(null);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim();
@@ -231,6 +244,8 @@ export default function TransportRequestsRoute() {
   const [modal, setModal] = useState<"new" | "details" | null>(null);
   const [toast, setToast] = useState("");
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [dataState, setDataState] = useState<"loading" | "ready" | "error">("loading");
+  const [mutationBusy, setMutationBusy] = useState(false);
   const actionInFlight = useRef(false);
   const pageSize = 5;
 
@@ -243,6 +258,21 @@ export default function TransportRequestsRoute() {
     const timer = window.setTimeout(() => setToast(""), 2400);
     return () => window.clearTimeout(timer);
   }, [toast]);
+  useEffect(() => {
+    if (!user || currentStage === "calendar" || currentStage === "active" || currentStage === "completed") return;
+    const controller = new AbortController();
+    const statuses = currentStage === "requests" ? "SUBMITTED,REJECTED,CANCELLED" : currentStage === "approval" ? "PENDING_APPROVAL,MORE_DETAILS_REQUIRED" : "APPROVED";
+    const params = new URLSearchParams({ status: statuses, page_size: "100" });
+    if (query) params.set("search", query);
+    getTransportRequests(params.toString(), controller.signal).then((result) => {
+      const key = currentStage;
+      setStageData((previous) => ({ ...previous, [key]: result.results.map(fromApi) }));
+      setDataState("ready");
+    }).catch((error: unknown) => {
+      if (!(error instanceof DOMException && error.name === "AbortError")) setDataState("error");
+    });
+    return () => controller.abort();
+  }, [currentStage, query, user]);
 
   if (loading) return <main className="tr-auth-state">Restoring secure session…</main>;
   if (!user) return <Redirect to={{ pathname: "/login", state: { from: location.pathname } }} />;
@@ -265,7 +295,7 @@ export default function TransportRequestsRoute() {
     if (stage !== "calendar" && stageData[stage][0]) setSelectedId(stageData[stage][0].id);
   };
 
-  const advanceSelected = () => {
+  const advanceSelected = async () => {
     if (currentStage === "calendar" || !selected || actionInFlight.current) return;
     const sourceStage = currentStage;
     const transitions: Partial<Record<Exclude<StageId, "calendar">, { target: Exclude<StageId, "calendar">; status: RequestStatus; label: string }>> = {
@@ -280,32 +310,49 @@ export default function TransportRequestsRoute() {
       return;
     }
     actionInFlight.current = true;
-    setStageData((previous) => ({ ...previous, [sourceStage]: previous[sourceStage].filter((item) => item.id !== selected.id), [transition.target]: [{ ...selected, status: transition.status }, ...previous[transition.target]] }));
-    setToast(transition.label);
-    switchStage(transition.target);
-    queueMicrotask(() => { actionInFlight.current = false; });
+    setMutationBusy(true);
+    try {
+      const action = sourceStage === "requests" ? "submit" : sourceStage === "approval" ? "approve" : null;
+      if (action) await transportRequestAction(selected.id, action);
+      setStageData((previous) => ({ ...previous, [sourceStage]: previous[sourceStage].filter((item) => item.id !== selected.id), [transition.target]: [{ ...selected, status: transition.status }, ...previous[transition.target]] }));
+      setToast(transition.label);
+      switchStage(transition.target);
+    } catch (error) {
+      setToast(error instanceof ApiError && error.status === 409 ? "Request changed; refresh and try again" : "Action failed; no changes were saved");
+    } finally {
+      actionInFlight.current = false;
+      setMutationBusy(false);
+    }
   };
 
-  const rejectSelected = () => {
+  const rejectSelected = async () => {
     if (currentStage !== "approval" || selected.status !== "pending" || actionInFlight.current) return;
     const rejectionReason = window.prompt("Rejection reason");
     if (!rejectionReason?.trim()) return;
     actionInFlight.current = true;
-    const next = stageData.approval.find((item) => item.id !== selected.id && item.status === "pending");
-    setStageData((previous) => ({ ...previous, approval: previous.approval.map((item) => item.id === selected.id ? { ...item, status: "rejected", rejectionReason: rejectionReason.trim(), rejectedBy: user.display_name, rejectedAt: new Date().toISOString() } : item) }));
-    if (next) setSelectedId(next.id);
-    setToast("Request rejected");
-    queueMicrotask(() => { actionInFlight.current = false; });
+    setMutationBusy(true);
+    try {
+      await transportRequestAction(selected.id, "reject", rejectionReason.trim());
+      setStageData((previous) => ({ ...previous, approval: previous.approval.filter((item) => item.id !== selected.id), requests: [{ ...selected, status: "rejected", rejectionReason: rejectionReason.trim(), rejectedBy: user.display_name, rejectedAt: new Date().toISOString() }, ...previous.requests] }));
+      setToast("Request rejected and retained in Requests");
+    } catch { setToast("Rejection failed; no changes were saved"); }
+    finally { actionInFlight.current = false; setMutationBusy(false); }
   };
 
-  const createRequest = (form: HTMLFormElement) => {
+  const createRequest = async (form: HTMLFormElement) => {
     const data = new FormData(form);
-    const created = request(`TR-${String(Date.now()).slice(-9)}`, String(data.get("type") || "Guest transfer"), String(data.get("requester") || "New requester"), String(data.get("origin") || "Oxford Suites Makati"), String(data.get("destination") || "Destination to confirm"), String(data.get("time") || "Now"), "new", String(data.get("priority")) === "High" ? "High" : "Normal", String(data.get("vehicle") || "Sedan"), "Unassigned", "—", "—", "Pending", "—", places.oxford, places.bgc, String(data.get("load") || ""), String(data.get("notes") || ""));
-    setStageData((previous) => ({ ...previous, requests: [created, ...previous.requests] }));
-    setCurrentStage("requests");
-    setSelectedId(created.id);
-    setModal(null);
-    setToast("New transport request created");
+    if (actionInFlight.current) return;
+    actionInFlight.current = true; setMutationBusy(true);
+    try {
+      const scheduled = new Date();
+      const [hours, minutes] = String(data.get("time") || "09:00").split(":").map(Number);
+      scheduled.setHours(hours, minutes, 0, 0);
+      const apiItem = await createTransportRequest({ request_type: requestTypeValue(String(data.get("type") || "Guest transfer")), requester_name: String(data.get("requester")), source_system: "MANUAL", pickup_address: String(data.get("origin")), destination_address: String(data.get("destination")), scheduled_at: scheduled.toISOString(), priority: String(data.get("priority")) === "High" ? "HIGH" : "NORMAL", required_vehicle_type: String(data.get("vehicle") || ""), passenger_count: Number(data.get("load")) || null, special_instructions: String(data.get("notes") || "") });
+      const created = fromApi(apiItem);
+      setStageData((previous) => ({ ...previous, requests: [created, ...previous.requests] }));
+      setCurrentStage("requests"); setSelectedId(created.id); setModal(null); setToast("New transport request created");
+    } catch { setToast("Request could not be created; check the form and try again"); }
+    finally { actionInFlight.current = false; setMutationBusy(false); }
   };
 
   const exportCurrent = () => {
@@ -319,10 +366,10 @@ export default function TransportRequestsRoute() {
     URL.revokeObjectURL(url);
   };
 
-  const actionLabel = currentStage === "requests" ? "Send for approval" : currentStage === "approval" ? "Approve request" : currentStage === "dispatch" ? "Dispatch trip" : currentStage === "active" ? "Complete trip" : "View summary";
+  const actionLabel = currentStage === "requests" ? "Send for approval" : currentStage === "approval" ? "Approve request" : currentStage === "dispatch" ? "Assignment planned" : currentStage === "active" ? "Trip lifecycle planned" : "View summary";
   const initials = user.display_name.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase();
 
-  return <div className="transport-app">
+  return <div className="transport-app" aria-busy={mutationBusy}>
     <header className="tr-topbar"><div className="tr-brand"><div className="tr-brand-mark">FT<br />MS</div><div><strong>Fleet Command</strong><span>Logistics 2 Operations</span></div></div><div className="tr-client-logo"><img src="/client-logo.svg" alt="Oxford Suites Makati" /></div><div className="tr-top-actions"><time dateTime={time.toISOString()}>{time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time><div className="tr-avatar" title={`${user.display_name} · ${user.role.replaceAll("_", " ")}`}>{initials}</div></div></header>
 
     <aside className="tr-sidebar"><div className="tr-side-search"><Icon name="search" /><input aria-label="Search all transport requests" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></div>
@@ -335,7 +382,7 @@ export default function TransportRequestsRoute() {
 
     <main className="tr-main"><section className="tr-page-head"><h1>Transport Requests</h1><div className="tr-page-actions"><span className="tr-simulated-label">Simulated Pilot Data</span><button type="button">‹ &nbsp; Today · {formatToday()} &nbsp; ›</button><button type="button" onClick={() => setToast("Transport data refreshed")}><Icon name="refresh" />Refresh</button><button type="button" onClick={exportCurrent}><Icon name="download" />Export</button><button type="button" className="is-primary" onClick={() => setModal("new")}><Icon name="plus" />New request</button></div></section>
       <nav className="tr-stage-tabs" aria-label="Transport request stages">{stages.map((stage) => <button key={stage.id} type="button" className={stage.id === currentStage ? "is-active" : ""} onClick={() => switchStage(stage.id)}><Icon name={stage.icon} /><span>{stage.label}</span><small>{stage.id === "calendar" ? allTrips.filter((item) => item.status !== "completed").length : stageData[stage.id].length}</small></button>)}</nav>
-      {currentStage === "calendar" ? <CalendarView /> : <section className="tr-workspace"><div className="tr-upper-grid">
+      {currentStage === "calendar" ? <CalendarView /> : dataState === "error" && !["active", "completed"].includes(currentStage) ? <div className="tr-empty" role="alert">Transport requests could not be loaded.</div> : <section className="tr-workspace"><div className="tr-upper-grid">
         <section className="tr-panel tr-request-panel"><div className="tr-panel-head"><strong>{currentStage === "requests" ? "Incoming requests" : currentStage === "approval" ? "Pending approval" : currentStage === "dispatch" ? "Approved and unassigned" : currentStage === "active" ? "Trips in progress" : "Completed trips"}</strong></div><div className="tr-list-filters"><div><Icon name="search" /><input aria-label="Search current stage" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></div><select aria-label="Filter status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}><option value="all">All status</option>{Array.from(new Set(rows.map((item) => item.status))).map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></div><div className="tr-request-list">{visibleRows.length ? visibleRows.map((item) => <button type="button" key={item.id} className={item.id === selected.id ? "is-selected" : ""} onClick={() => setSelectedId(item.id)}><span className="tr-initials">{item.requester.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><span className="tr-request-main"><strong>{item.id}</strong><small>{item.type}</small><em>{item.origin} → {item.destination}</em><i>{item.scheduledTime} · {item.requester} · {item.distance}</i></span><span className="tr-request-side"><b className={`is-${item.status}`}>{statusLabel(item.status)}</b><small className={item.priority === "High" ? "is-high" : ""}>{item.priority}</small></span></button>) : <div className="tr-empty">No requests match your filters.</div>}</div><div className="tr-list-footer"><span>{filteredRows.length} request{filteredRows.length === 1 ? "" : "s"}</span><div>{Array.from({ length: totalPages }, (_, index) => <button key={index + 1} type="button" className={safePage === index + 1 ? "is-active" : ""} onClick={() => setPage(index + 1)}>{index + 1}</button>)}</div></div></section>
         <section className="tr-panel tr-map-panel"><GoogleMapCanvas trip={selected} /><div className="tr-map-card"><div className="tr-driver-row"><span className="tr-driver-avatar">{selected.driver === "Unassigned" ? "—" : selected.driver.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><div><strong>{selected.driver === "Unassigned" ? "Driver not assigned" : selected.driver}</strong><span>{selected.status === "active" ? "Moving W at 32 mph" : selected.status === "completed" ? "Trip completed" : selected.status === "approved" ? "Ready for dispatch" : selected.status === "rejected" ? `Rejected: ${selected.rejectionReason}` : "Awaiting assignment"}</span>{selected.status === "rejected" && <small>Rejected by {selected.rejectedBy} at {selected.rejectedAt}</small>}<small>{selected.origin} · {selected.scheduledTime}</small><small>Passengers / load: {selected.passengerOrLoad || "—"}</small>{selected.specialInstructions && <small>Instructions: {selected.specialInstructions}</small>}</div></div><div className="tr-driver-stats"><span><b>{selected.eta}</b><small>ETA</small></span><span><b>{selected.safety}</b><small>Safety</small></span><span><b>{selected.vehicle.split("·").pop()?.trim()}</b><small>Vehicle</small></span></div><div className="tr-map-actions">{selected.status !== "rejected" && <button type="button" className="is-primary" onClick={advanceSelected}>{actionLabel}</button>}{currentStage === "approval" && selected.status === "pending" && <><button type="button" onClick={() => setToast("More details requested")}>Request details</button><button type="button" className="is-danger" onClick={rejectSelected}>Reject</button></>}</div></div></section>
       </div>
