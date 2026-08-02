@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "health",
     "fleet",
     "telemetry",
+    "transport_requests",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -80,6 +81,7 @@ USE_I18N = True
 USE_TZ = True
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 
 def env_list(name, default=""):
     return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
