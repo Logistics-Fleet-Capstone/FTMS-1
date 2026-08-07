@@ -3,16 +3,21 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import App from "../../App";
 import type { Role } from "../../services/auth";
+import RequestMap from "./components/RequestMap";
+import type { TransportRequestBase } from "./types";
 
 const auth = vi.hoisted(() => ({
   user: { id: 1, username: "staff", display_name: "Staff User", role: "FLEET_MANAGER" as Role } as { id: number; username: string; display_name: string; role: Role } | null,
   loading: false, signIn: vi.fn(), signOut: vi.fn(), expire: vi.fn(),
 }));
 vi.mock("../../AuthContext", () => ({ useAuth: () => auth }));
+const leaflet = vi.hoisted(() => ({ tileUrls: [] as string[], polylines: [] as [number, number][][], fitBounds: vi.fn(), setView: vi.fn(), invalidateSize: vi.fn() }));
 vi.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="request-map">{children}</div>,
-  TileLayer: () => null, CircleMarker: () => null, Polyline: () => null,
-  useMap: () => ({ fitBounds: vi.fn(), setView: vi.fn() }),
+  TileLayer: ({ url, eventHandlers }: { url: string; eventHandlers?: { tileerror?: () => void } }) => { leaflet.tileUrls.push(url); const layer = url.includes("/traffic/flow/") ? "tomtom-traffic-layer" : url.includes("/traffic/incidents/") ? "tomtom-incidents-layer" : "tomtom-base-layer"; return <span data-testid={layer} onClick={() => eventHandlers?.tileerror?.()} />; },
+  CircleMarker: ({ center }: { center: [number, number] }) => <span data-testid="request-marker">{center.join(",")}</span>,
+  Polyline: ({ positions }: { positions: [number, number][] }) => { leaflet.polylines.push(positions); return <span data-testid="request-route" />; },
+  useMap: () => ({ fitBounds: leaflet.fitBounds, setView: leaflet.setView, invalidateSize: leaflet.invalidateSize, getContainer: () => document.createElement("div") }),
 }));
 
 const request = {
@@ -32,20 +37,86 @@ const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body
 const errorJson = (body: unknown, status = 400) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
 
 beforeEach(() => {
+  leaflet.tileUrls.length = 0; leaflet.polylines.length = 0; leaflet.fitBounds.mockClear(); leaflet.setView.mockClear(); leaflet.invalidateSize.mockClear(); vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "");
   auth.user = { id: 1, username: "staff", display_name: "Staff User", role: "FLEET_MANAGER" };
   vi.spyOn(globalThis, "fetch").mockImplementation(input => {
     const url = String(input);
     if (url.endsWith("summary/")) return json(summary);
+    if (url.endsWith(`${request.id}/route/`)) return json({ request_id: request.id, traffic_mode: "live", distance_meters: 12400, duration_seconds: 1860, traffic_delay_seconds: 360, departure_time: "2026-08-07T10:00:00+08:00", arrival_time: "2026-08-07T10:31:00+08:00", geometry: { type: "LineString", coordinates: [[121.0198, 14.5086], [121.025, 14.54], [121.0286, 14.5652]] } });
     if (url.includes("calendar/?")) return json({ start: "2026-08-03", end: "2026-08-09", timezone: "Asia/Manila", results: [{ ...request, calendar_date: "2026-08-06", planning_end_at: "2026-08-06T11:00:00Z", vehicle_conflict: true, conflicting_requests: ["TR-OTHER"] }] });
     if (url.includes("/vehicles/")) return json({ count: 0, next: null, previous: null, results: [] });
     if (url.endsWith(`${request.id}/`)) return json(request);
     return json({ count: 1, next: null, previous: null, results: [request] });
   });
 });
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 const renderAt = (path: string) => render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>);
 
 describe("Sprint 4 Transport Requests corrections", () => {
+  test("keeps Leaflet mounted and reports a missing TomTom key", () => {
+    render(<RequestMap request={null} />);
+    expect(screen.getByTestId("request-map").closest(".request-map")).toHaveClass("tomtom-request-map", "request-map--empty");
+    expect(screen.getByRole("alert")).toHaveTextContent("TomTom map key is not configured.");
+    expect(screen.getByText("No request selected")).toBeInTheDocument();
+  });
+  test("configures the Orbis v2 base, flow, and incident raster layers", () => {
+    vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "configured-in-test"); render(<RequestMap request={request as TransportRequestBase} />);
+    expect(screen.getByTestId("tomtom-base-layer")).toBeInTheDocument(); expect(screen.getByTestId("tomtom-traffic-layer")).toBeInTheDocument(); expect(screen.getByTestId("tomtom-incidents-layer")).toBeInTheDocument();
+    expect(leaflet.tileUrls.some(url => url.includes("/maps/orbis/display/raster/tile/{z}/{x}/{y}") && url.includes("apiVersion=2") && url.includes("style=street-light"))).toBe(true);
+    expect(leaflet.tileUrls.some(url => url.includes("/maps/orbis/traffic/flow/raster/tile/{z}/{x}/{y}") && url.includes("apiVersion=2"))).toBe(true);
+    expect(leaflet.tileUrls.some(url => url.includes("/maps/orbis/traffic/incidents/raster/tile/{z}/{x}/{y}") && url.includes("apiVersion=2"))).toBe(true);
+    expect(leaflet.tileUrls.some(url => url.includes("openstreetmap"))).toBe(false); expect(screen.getAllByTestId("request-marker")).toHaveLength(2); expect(leaflet.fitBounds).toHaveBeenCalled();
+  });
+  test("toggles traffic without remounting the base map", () => {
+    vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "configured-in-test"); render(<RequestMap request={null} />);
+    const map = screen.getByTestId("request-map"); fireEvent.click(screen.getByRole("button", { name: "Traffic on" }));
+    expect(screen.getByRole("button", { name: "Traffic off" })).toHaveAttribute("aria-pressed", "false"); expect(screen.queryByTestId("tomtom-traffic-layer")).not.toBeInTheDocument(); expect(screen.getByTestId("tomtom-base-layer")).toBeInTheDocument(); expect(screen.getByTestId("request-map")).toBe(map);
+  });
+  test("toggles incidents independently and handles tile failures", async () => {
+    vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "configured-in-test"); render(<RequestMap request={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Incidents on" })); expect(screen.getByRole("button", { name: "Incidents off" })).toHaveAttribute("aria-pressed", "false"); expect(screen.queryByTestId("tomtom-incidents-layer")).not.toBeInTheDocument(); expect(screen.getByTestId("tomtom-traffic-layer")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("tomtom-base-layer")); expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load TomTom map tiles.");
+  });
+  test("returns the no-selection map to the Oxford Suites fallback", () => {
+    vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "configured-in-test"); render(<RequestMap request={null} />);
+    expect(leaflet.setView).toHaveBeenCalledWith([14.5652, 121.0286], 13); expect(screen.getByText("No request selected")).toBeInTheDocument(); expect(screen.queryByTestId("request-marker")).not.toBeInTheDocument();
+  });
+  test("draws only backend road geometry and fits it with the request markers", () => {
+    vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "configured-in-test");
+    const route = { request_id: request.id, traffic_mode: "live" as const, distance_meters: 12400, duration_seconds: 1860, traffic_delay_seconds: 360, departure_time: "2026-08-07T10:00:00+08:00", arrival_time: "2026-08-07T10:31:00+08:00", geometry: { type: "LineString" as const, coordinates: [[121.0198, 14.5086], [121.025, 14.54], [121.0286, 14.5652]] as [number, number][] } };
+    render(<RequestMap request={request as TransportRequestBase} route={route} routeState="ready" />);
+    expect(screen.getByTestId("request-route")).toBeInTheDocument();
+    expect(leaflet.polylines[0]).toEqual([[14.5086, 121.0198], [14.54, 121.025], [14.5652, 121.0286]]);
+  });
+  test("loads routing only for the selected request and renders live metrics", async () => {
+    vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "configured-in-test"); renderAt("/transport-requests");
+    expect(await screen.findByTestId("request-route")).toBeInTheDocument();
+    expect(screen.getAllByText("12.4 km").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/31 min/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\+6 min traffic/).length).toBeGreaterThan(0);
+    const routeCalls = vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => String(input).endsWith("/route/"));
+    expect(routeCalls).toHaveLength(1);
+    expect(vi.mocked(globalThis.fetch).mock.calls.some(([input]) => String(input).includes("api.tomtom.com/maps/orbis/routing"))).toBe(false);
+  });
+  test("shows non-blocking route loading and reuses a calculated route on reselection", async () => {
+    vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "configured-in-test");
+    const second = { ...request, id: "49bc47e8-74f8-4340-a94c-e9cc5619e734", request_number: "TR-SECOND" };
+    const routeBody = (id: string) => ({ request_id: id, traffic_mode: "live", distance_meters: 12400, duration_seconds: 1860, traffic_delay_seconds: 360, departure_time: "2026-08-07T10:00:00+08:00", arrival_time: "2026-08-07T10:31:00+08:00", geometry: { type: "LineString", coordinates: [[121.0198, 14.5086], [121.0286, 14.5652]] } });
+    let releaseFirst!: () => void; const firstPending = new Promise<Response>(resolve => { releaseFirst = () => resolve(new Response(JSON.stringify(routeBody(request.id)), { status: 200, headers: { "Content-Type": "application/json" } })); });
+    vi.mocked(globalThis.fetch).mockImplementation(input => { const url = String(input); if (url.endsWith("summary/")) return json({ ...summary, total: 2, for_approval: 2, approval_queue: 2 }); if (url.endsWith(`${request.id}/route/`)) return firstPending; if (url.endsWith(`${second.id}/route/`)) return json(routeBody(second.id)); return json({ count: 2, next: null, previous: null, results: [request, second] }); });
+    renderAt("/transport-requests"); expect(await screen.findAllByText("Calculating route…")).not.toHaveLength(0); expect(screen.getByTestId("request-map")).toBeInTheDocument();
+    releaseFirst(); await screen.findByTestId("request-route");
+    fireEvent.click(screen.getByRole("button", { name: /TR-SECOND/ })); await waitFor(() => expect(vi.mocked(globalThis.fetch).mock.calls.some(([input]) => String(input).endsWith(`${second.id}/route/`))).toBe(true));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(request.request_number) }));
+    await waitFor(() => expect(vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => String(input).endsWith(`${request.id}/route/`))).toHaveLength(1));
+  });
+  test("keeps the map usable when routing fails", async () => {
+    vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "configured-in-test");
+    vi.mocked(globalThis.fetch).mockImplementation(input => { const url = String(input); if (url.endsWith("summary/")) return json(summary); if (url.endsWith("/route/")) return errorJson({ detail: "Route unavailable." }, 502); return json({ count: 1, next: null, previous: null, results: [request] }); });
+    renderAt("/transport-requests");
+    expect(await screen.findAllByText("Route unavailable")).not.toHaveLength(0);
+    expect(screen.getByTestId("request-map")).toBeInTheDocument(); expect(screen.queryByTestId("request-route")).not.toBeInTheDocument();
+  });
   test("protects the route", async () => {
     auth.user = null; renderAt("/transport-requests");
     expect(await screen.findByRole("heading", { name: "Sign in to FTMS" })).toBeInTheDocument();
@@ -239,7 +310,8 @@ describe("Sprint 4 Transport Requests corrections", () => {
     await screen.findAllByText("TR-20260806-A1B2C3"); fireEvent.click(screen.getByRole("tab", { name: /Dispatch Queue/ }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes("status=APPROVED"))).toBe(true));
     expect(screen.getAllByText("Planned").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/Juan Dela Cruz|₱|\d+ km|\d+ min ETA/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Juan Dela Cruz|₱/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/12\.4 km/).length).toBeGreaterThan(0);
   });
   test("Calendar hides KPIs and preserves its full-height scroll structure across views", async () => {
     renderAt("/transport-requests"); await screen.findAllByText("TR-20260806-A1B2C3");

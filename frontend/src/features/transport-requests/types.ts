@@ -20,6 +20,11 @@ export type TransportRequestListItem = TransportRequestBase & { latest_event_typ
 export type TransportRequest = TransportRequestBase & { events: TransportEvent[] };
 export type CalendarRequest = TransportRequestBase & { calendar_date: string; planning_end_at: string; vehicle_conflict: boolean; conflicting_requests: string[] };
 export type RequestPage = { count: number; next: string | null; previous: string | null; results: TransportRequestListItem[] };
+export type TransportRoute = {
+  request_id: string; traffic_mode: "live"; distance_meters: number; duration_seconds: number;
+  traffic_delay_seconds: number; departure_time: string; arrival_time: string;
+  geometry: { type: "LineString"; coordinates: [number, number][] };
+};
 export type Summary = {
   total: number; for_approval: number; needs_more_details: number; approval_queue: number;
   dispatch_queue: number; approved_unassigned: number; approved_assigned: number;

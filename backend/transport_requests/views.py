@@ -14,7 +14,7 @@ from accounts.permissions import StaffAccess
 from accounts.roles import SUPER_ADMIN, resolve_role
 from fleet.models import Vehicle
 
-from . import services
+from . import routing, services
 from .models import TransportRequest, TransportRequestEvent
 from .serializers import (
     CalendarTransportRequestSerializer,
@@ -206,6 +206,31 @@ class TransportRequestDetailView(APIView):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data)
+
+
+class TransportRequestRouteView(APIView):
+    permission_classes = [StaffAccess]
+    http_method_names = ["get", "options"]
+
+    def get(self, request, request_id):
+        item = get_object_or_404(TransportRequest, pk=request_id)
+        try:
+            return Response(routing.get_route(item))
+        except routing.RouteCoordinateError:
+            return Response(
+                {"detail": "The transport request has invalid route coordinates."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except routing.RouteConfigurationError:
+            return Response(
+                {"detail": "Routing service is not configured."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except routing.RouteServiceError:
+            return Response(
+                {"detail": "Route unavailable."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
 
 class SummaryView(APIView):

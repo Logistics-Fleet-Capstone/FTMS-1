@@ -12,6 +12,7 @@ from .views import (
     SummaryView,
     TransportRequestDetailView,
     TransportRequestListView,
+    TransportRequestRouteView,
 )
 
 urlpatterns = [
@@ -22,6 +23,7 @@ urlpatterns = [
         "<uuid:request_id>/", TransportRequestDetailView.as_view(),
         name="transport-request-detail",
     ),
+    path("<uuid:request_id>/route/", TransportRequestRouteView.as_view(), name="transport-request-route"),
     path("<uuid:request_id>/approve/", ApproveView.as_view()),
     path("<uuid:request_id>/reject/", RejectView.as_view()),
     path("<uuid:request_id>/request-more-details/", RequestMoreDetailsView.as_view()),
