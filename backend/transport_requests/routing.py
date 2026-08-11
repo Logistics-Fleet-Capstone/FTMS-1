@@ -7,7 +7,6 @@ from urllib.request import Request, urlopen
 from django.conf import settings
 from django.core.cache import cache
 
-
 ROUTING_URL = "https://api.tomtom.com/maps/orbis/routing/routes/calculate"
 ROUTE_CACHE_TTL_SECONDS = 120
 ROUTE_TIMEOUT_SECONDS = 8
@@ -38,8 +37,14 @@ def _coordinate(value, *, latitude):
 
 def _request_coordinates(item):
     return (
-        [_coordinate(item.pickup_longitude, latitude=False), _coordinate(item.pickup_latitude, latitude=True)],
-        [_coordinate(item.destination_longitude, latitude=False), _coordinate(item.destination_latitude, latitude=True)],
+        [
+            _coordinate(item.pickup_longitude, latitude=False),
+            _coordinate(item.pickup_latitude, latitude=True),
+        ],
+        [
+            _coordinate(item.destination_longitude, latitude=False),
+            _coordinate(item.destination_latitude, latitude=True),
+        ],
     )
 
 
@@ -47,13 +52,20 @@ def _merge_geometry(legs):
     coordinates = []
     for leg in legs:
         path = leg.get("path") if isinstance(leg, dict) else None
-        points = path.get("coordinates") if isinstance(path, dict) and path.get("type") == "LineString" else None
+        points = (
+            path.get("coordinates")
+            if isinstance(path, dict) and path.get("type") == "LineString"
+            else None
+        )
         if not isinstance(points, list) or len(points) < 2:
             raise RouteServiceError
         for point in points:
             if not isinstance(point, list) or len(point) != 2:
                 raise RouteServiceError
-            normalized = [_coordinate(point[0], latitude=False), _coordinate(point[1], latitude=True)]
+            normalized = [
+                _coordinate(point[0], latitude=False),
+                _coordinate(point[1], latitude=True),
+            ]
             if not coordinates or coordinates[-1] != normalized:
                 coordinates.append(normalized)
     if len(coordinates) < 2:
@@ -75,7 +87,10 @@ def _normalize(payload):
         }
     except (KeyError, IndexError, TypeError, ValueError, OverflowError) as error:
         raise RouteServiceError from error
-    if min(result["distance_meters"], result["duration_seconds"], result["traffic_delay_seconds"]) < 0:
+    if (
+        min(result["distance_meters"], result["duration_seconds"], result["traffic_delay_seconds"])
+        < 0
+    ):
         raise RouteServiceError
     return result
 
