@@ -12,11 +12,11 @@ export function AppButton({ label, variant = 'primary', style, ...props }: AppBu
   return (
     <Pressable
       accessibilityRole="button"
-      style={({ pressed }) => [
+      style={(state) => [
         styles.button,
         variant === 'secondary' ? styles.secondary : styles.primary,
-        pressed && styles.pressed,
-        typeof style === 'function' ? style({ pressed }) : style,
+        state.pressed && styles.pressed,
+        typeof style === 'function' ? style(state) : style,
       ]}
       {...props}>
       <Text style={variant === 'secondary' ? styles.secondaryLabel : styles.primaryLabel}>

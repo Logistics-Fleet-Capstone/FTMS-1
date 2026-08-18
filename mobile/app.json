@@ -11,6 +11,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.ftms.driver",
       "adaptiveIcon": {
         "backgroundColor": "#8f172b",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -37,6 +38,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "163145bd-c92c-4d5c-b581-659283bda6fc"
+      }
     }
   }
 }

@@ -6,3 +6,15 @@ export type PlannedMobileFeature =
   | 'INCIDENTS'
   | 'COMPLETION'
   | 'PROFILE';
+
+export type { DriverIdentity } from './driverAuth';
+export type {
+  DriverTrip,
+  DriverTripExecution,
+  DriverTripExecutionAction,
+  DriverTripExecutionStatus,
+  DriverTripPlace,
+  DriverTripRoute,
+  DriverTripVehicle,
+  DriverVehiclePosition,
+} from './driverTrips';

@@ -42,7 +42,14 @@ export function AppScreen({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.canvas },
   scrollContent: { flexGrow: 1 },
-  content: { flex: 1, padding: spacing.lg, gap: spacing.lg },
+  content: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+    padding: spacing.lg,
+    gap: spacing.lg,
+  },
   heading: { gap: spacing.xs },
   eyebrow: {
     color: colors.burgundy,

@@ -49,7 +49,10 @@ function renderAt(path: string) {
   return render(<StrictMode><MemoryRouter initialEntries={[path]}><App /></MemoryRouter></StrictMode>);
 }
 function renderWithHistory(path: string, state?: unknown) {
-  const history = createMemoryHistory({ initialEntries: [{ pathname: path, state }] });
+  const [pathname, query = ""] = path.split("?", 2);
+  const history = createMemoryHistory({
+    initialEntries: [{ pathname, search: query ? `?${query}` : "", state }],
+  });
   return {
     history,
     ...render(<StrictMode><Router history={history}><App /></Router></StrictMode>),
@@ -81,6 +84,29 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("Sprint 3 secure registry", () => {
+  test("renders driver password setup publicly for an anonymous browser and preserves its query", () => {
+    auth.user = null as unknown as typeof auth.user;
+    const { history } = renderWithHistory("/setup-password?uid=dummy-uid&token=dummy-token");
+    expect(screen.getByRole("heading", { name: "Set up your Driver account" })).toBeInTheDocument();
+    expect(screen.queryByText("Restoring session…")).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(history.location.pathname).toBe("/setup-password");
+    expect(history.location.search).toBe("?uid=dummy-uid&token=dummy-token");
+  });
+  test("renders driver password setup for authenticated staff without entering the staff app", () => {
+    const { history } = renderWithHistory("/setup-password?uid=dummy-uid&token=dummy-token");
+    expect(screen.getByRole("heading", { name: "Set up your Driver account" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(history.location.pathname).toBe("/setup-password");
+    expect(history.location.search).toBe("?uid=dummy-uid&token=dummy-token");
+  });
+  test("renders driver password setup while staff authentication is still bootstrapping", () => {
+    auth.user = null as unknown as typeof auth.user;
+    auth.loading = true;
+    renderAt("/setup-password?uid=dummy-uid&token=dummy-token");
+    expect(screen.getByRole("heading", { name: "Set up your Driver account" })).toBeInTheDocument();
+    expect(screen.queryByText("Restoring session…")).not.toBeInTheDocument();
+  });
   test("redirects an anonymous user to login", async () => {
     auth.user = null as unknown as typeof auth.user;
     renderAt("/vehicles");
@@ -106,6 +132,11 @@ describe("Sprint 3 secure registry", () => {
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret" } });
     fireEvent.submit(screen.getByRole("button", { name: "Sign in" }).closest("form")!);
     await waitFor(() => expect(history.location.pathname).toBe("/vehicles/LILYGO-001"));
+  });
+  test("authenticated staff visiting login still reaches the operational landing route", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => response({ count: 0, next: null, previous: null, results: [] }));
+    const { history } = renderWithHistory("/login");
+    await waitFor(() => expect(history.location.pathname).toBe("/transport-requests"));
   });
   test("rapid login submissions invoke sign-in once", async () => {
     auth.user = null as unknown as typeof auth.user;
