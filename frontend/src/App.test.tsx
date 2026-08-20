@@ -112,7 +112,7 @@ describe("Sprint 3 secure registry", () => {
     auth.user.role = "SUPER_ADMIN";
     vi.spyOn(globalThis, "fetch").mockImplementation(() => response({ count: 0, next: null, previous: null, results: [] }));
     renderAt("/vehicles");
-    expect(await screen.findByText("Create vehicle")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "+ Add Vehicle" })).toBeInTheDocument();
     expect(screen.getByText("No vehicles match these filters.")).toBeInTheDocument();
   });
   test("list exposes loading, filtering, and error states", async () => {
@@ -120,7 +120,7 @@ describe("Sprint 3 secure registry", () => {
     renderAt("/vehicles"); expect(screen.getByText("Loading vehicles…")).toBeInTheDocument();
     await screen.findByText("No vehicles match these filters.");
     fireEvent.change(screen.getByLabelText("Search"), { target: { value: "demo" } });
-    fireEvent.click(screen.getByText("Apply filters"));
+    fireEvent.click(screen.getByRole("button", { name: "Apply Filters" }));
     await waitFor(() => expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain("search=demo"));
   });
   test("detail preserves live pilot label and nullable rendering", async () => {

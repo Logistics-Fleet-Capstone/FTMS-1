@@ -9,7 +9,6 @@ from django.db import IntegrityError, transaction
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
-
 logger = logging.getLogger(__name__)
 
 
