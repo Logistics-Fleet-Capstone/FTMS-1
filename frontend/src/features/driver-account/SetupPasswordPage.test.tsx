@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryHistory } from "history";
 import { MemoryRouter, Route, Router } from "react-router-dom";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { apiBaseUrl } from "../../services/api";
 import SetupPasswordPage from "./SetupPasswordPage";
 
 function response(body: unknown, status = 200) {
@@ -76,8 +77,8 @@ describe("public driver password setup", () => {
 
     expect(await screen.findByRole("heading", { name: "Password set successfully" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(String(fetchMock.mock.calls[0][0])).toBe("http://localhost:8000/api/v1/driver-auth/csrf/");
-    expect(String(fetchMock.mock.calls[1][0])).toBe("http://localhost:8000/api/v1/driver-auth/setup-password/");
+    expect(String(fetchMock.mock.calls[0][0])).toBe(`${apiBaseUrl}/api/v1/driver-auth/csrf/`);
+    expect(String(fetchMock.mock.calls[1][0])).toBe(`${apiBaseUrl}/api/v1/driver-auth/setup-password/`);
     const request = fetchMock.mock.calls[1][1]!;
     expect(request.method).toBe("POST");
     expect(request.credentials).toBe("include");
