@@ -191,9 +191,9 @@ describe("Sprint 4 Transport Requests corrections", () => {
     maplibre.controlsAvailable = false; vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "configured-in-test"); render(<RequestMap request={null} />);
     expect(screen.getByTestId("request-map")).toBeInTheDocument(); expect(screen.queryByText("Unable to load TomTom map.")).not.toBeInTheDocument();
   });
-  test("keeps the map shell mounted and reports an initialization failure", () => {
+  test("keeps the map shell mounted and reports an initialization failure", async () => {
     maplibre.failConstruction = true; vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "configured-in-test"); render(<RequestMap request={null} />);
-    expect(screen.getByTestId("request-map")).toBeInTheDocument(); expect(screen.getByRole("alert")).toHaveTextContent("Unable to load TomTom map.");
+    expect(screen.getByTestId("request-map")).toBeInTheDocument(); expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load TomTom map.");
   });
   test("opens the compact map settings menu, defaults to Street, and closes on Escape or outside click", () => {
     vi.stubEnv("VITE_TOMTOM_MAPS_KEY", "configured-in-test"); render(<RequestMap request={null} />); const button = screen.getByRole("button", { name: "Map settings" });

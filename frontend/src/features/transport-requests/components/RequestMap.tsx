@@ -172,8 +172,13 @@ export default function RequestMap({ request, route, routeState, operationalLoca
       try { mapRef.current?.remove?.(); } catch { /* partially initialized maps may not support cleanup */ }
       mapRef.current = null;
       mapLoadedRef.current = false;
-      setMapLoaded(false);
-      setMapError(true);
+      let active = true;
+      queueMicrotask(() => {
+        if (!active) return;
+        setMapLoaded(false);
+        setMapError(true);
+      });
+      return () => { active = false; };
     }
   }, [tomTomKey]);
 
