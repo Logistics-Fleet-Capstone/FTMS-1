@@ -1,9 +1,9 @@
 from rest_framework import serializers
 
 from .models import (
+    VALID_MODULE_ACTIONS,
     PermissionAction,
     StaffProfile,
-    VALID_MODULE_ACTIONS,
 )
 
 

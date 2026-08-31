@@ -6,11 +6,11 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import (
+    VALID_MODULE_ACTIONS,
     PermissionAction,
     PermissionModule,
     RolePermission,
     StaffProfile,
-    VALID_MODULE_ACTIONS,
 )
 from accounts.roles import has_module_permission
 
@@ -22,7 +22,11 @@ class RolePermissionModelTests(TestCase):
     def test_managed_roles_can_store_valid_permissions(self):
         for role, module, action in (
             (StaffProfile.Role.FLEET_MANAGER, PermissionModule.VEHICLES, PermissionAction.EDIT),
-            (StaffProfile.Role.DISPATCHER, PermissionModule.DISPATCH_BOARD, PermissionAction.DISPATCH),
+            (
+                StaffProfile.Role.DISPATCHER,
+                PermissionModule.DISPATCH_BOARD,
+                PermissionAction.DISPATCH,
+            ),
         ):
             with self.subTest(role=role):
                 permission = RolePermission(role=role, module=module, action=action)
@@ -214,7 +218,11 @@ class RolePermissionApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            set(RolePermission.objects.filter(role="FLEET_MANAGER").values_list("module", "action")),
+            set(
+                RolePermission.objects.filter(role="FLEET_MANAGER").values_list(
+                    "module", "action"
+                )
+            ),
             {("VEHICLES", "EDIT"), ("MAINTENANCE", "VIEW")},
         )
         self.assertTrue(RolePermission.objects.filter(pk=dispatcher.pk).exists())
@@ -275,9 +283,16 @@ class RolePermissionApiTests(TestCase):
 
     def test_empty_matrix_does_not_change_existing_auth_or_staff_management(self):
         self.assertEqual(RolePermission.objects.count(), 0)
-        self.assertEqual(self.client_for(self.manager).get("/api/v1/auth/me/").status_code, 200)
-        self.assertEqual(self.client_for(self.manager).get("/api/v1/auth/staff/").status_code, 403)
-        self.assertEqual(self.client_for(self.super_admin).get("/api/v1/auth/staff/").status_code, 200)
+        self.assertEqual(
+            self.client_for(self.manager).get("/api/v1/auth/me/").status_code, 200
+        )
+        self.assertEqual(
+            self.client_for(self.manager).get("/api/v1/auth/staff/").status_code, 403
+        )
+        self.assertEqual(
+            self.client_for(self.super_admin).get("/api/v1/auth/staff/").status_code,
+            200,
+        )
 
     def test_definition_inventory_is_exact(self):
         self.assertEqual(
@@ -287,11 +302,25 @@ class RolePermissionApiTests(TestCase):
                 "DISPATCH_BOARD": ["VIEW", "ASSIGN", "DISPATCH", "OVERRIDE"],
                 "LIVE_MAP": ["VIEW", "MANAGE_GEOFENCES"],
                 "DRIVERS": ["VIEW", "CREATE", "EDIT", "MANAGE_DOCUMENTS"],
-                "VEHICLES": ["VIEW", "CREATE", "EDIT", "CHANGE_STATUS", "INSPECT", "MANAGE_DOCUMENTS"],
+                "VEHICLES": [
+                    "VIEW",
+                    "CREATE",
+                    "EDIT",
+                    "CHANGE_STATUS",
+                    "INSPECT",
+                    "MANAGE_DOCUMENTS",
+                ],
                 "FUEL_ANALYTICS": ["VIEW"],
                 "MAINTENANCE": ["VIEW"],
                 "SYSTEM_SETTINGS": ["VIEW"],
-                "USERS_ACCESS": ["VIEW_USERS", "CREATE_USER", "EDIT_USER", "CHANGE_USER_STATUS", "ASSIGN_ROLE", "MANAGE_ROLE_PERMISSIONS"],
+                "USERS_ACCESS": [
+                    "VIEW_USERS",
+                    "CREATE_USER",
+                    "EDIT_USER",
+                    "CHANGE_USER_STATUS",
+                    "ASSIGN_ROLE",
+                    "MANAGE_ROLE_PERMISSIONS",
+                ],
             },
         )
 

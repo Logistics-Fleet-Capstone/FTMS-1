@@ -73,9 +73,18 @@ function StaffUsersManager() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void load(controller.signal);
+    listStaff(controller.signal)
+      .then(setStaff)
+      .catch((reason) => {
+        if (!(reason instanceof DOMException && reason.name === "AbortError")) {
+          setLoadError(errorMessage(reason));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
     return () => controller.abort();
-  }, [load]);
+  }, []);
 
   useEffect(() => {
     if (openMenuId === null) return;

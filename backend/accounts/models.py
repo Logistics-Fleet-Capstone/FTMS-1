@@ -106,12 +106,12 @@ class RolePermission(models.Model):
         ]
         ordering = ("role", "module", "action")
 
+    def __str__(self):
+        return f"{self.role}: {self.module}.{self.action}"
+
     def clean(self):
         super().clean()
         if not valid_module_action(self.module, self.action):
             raise ValidationError(
                 {"action": "Action is not valid for the selected module."}
             )
-
-    def __str__(self):
-        return f"{self.role}: {self.module}.{self.action}"

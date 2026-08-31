@@ -17,8 +17,8 @@ from rest_framework.views import APIView
 from fleet.models import Driver
 from fleet.serializers import driver_eligibility
 
+from .models import VALID_MODULE_ACTIONS, RolePermission, StaffProfile
 from .permissions import DriverAccess, StaffAccess
-from .models import RolePermission, StaffProfile, VALID_MODULE_ACTIONS
 from .roles import SUPER_ADMIN, resolve_role, user_data
 from .serializers import (
     DriverPasswordSetupSerializer,
@@ -121,11 +121,12 @@ class SuperAdminManagedStaffMixin:
         if not user.is_staff:
             raise serializers.ValidationError({"user": ["User is not a staff account."]})
         try:
-            user.staff_profile
+            staff_profile = user.staff_profile
         except StaffProfile.DoesNotExist as error:
             raise serializers.ValidationError(
                 {"user": ["Staff account has no valid StaffProfile."]}
             ) from error
+        del staff_profile
         return user
 
 
@@ -294,9 +295,10 @@ class StaffPasswordSetupView(APIView):
         except (ValueError, TypeError, OverflowError, get_user_model().DoesNotExist):
             return self.invalid_link_response()
         try:
-            user.staff_profile
+            staff_profile = user.staff_profile
         except StaffProfile.DoesNotExist:
             return self.invalid_link_response()
+        del staff_profile
         if (
             not user.is_active
             or not user.is_staff

@@ -11,7 +11,10 @@ from ml.maintenance import contracts, load_model, predict, readiness
 
 
 def median_inputs():
-    return {name: spec["development_data_range"]["median"] for name, spec in contracts()[1]["features"].items()}
+    return {
+        name: spec["development_data_range"]["median"]
+        for name, spec in contracts()[1]["features"].items()
+    }
 
 
 class MaintenanceContractTests(SimpleTestCase):
@@ -65,12 +68,25 @@ class MaintenanceContractTests(SimpleTestCase):
 
     def test_invalid_and_abstained_inputs(self):
         base = median_inputs()
-        self.assertEqual(predict({**base, "extra": 1}, "research_replay")["status"], "invalid_input")
+        self.assertEqual(
+            predict({**base, "extra": 1}, "research_replay")["status"],
+            "invalid_input",
+        )
         for value in (True, "not-a-number", float("nan"), float("inf"), 0.452):
             with self.subTest(value=value):
-                self.assertEqual(predict({**base, "MAP": value}, "research_replay")["status"], "invalid_input")
-        self.assertEqual(predict({k: v for k, v in base.items() if k != "Speed"}, "research_replay")["status"], "prediction_blocked")
-        self.assertEqual(predict({**base, "MAP": 0.95}, "research_replay")["status"], "abstained")
+                self.assertEqual(
+                    predict({**base, "MAP": value}, "research_replay")["status"],
+                    "invalid_input",
+                )
+        missing_speed = {key: value for key, value in base.items() if key != "Speed"}
+        self.assertEqual(
+            predict(missing_speed, "research_replay")["status"],
+            "prediction_blocked",
+        )
+        self.assertEqual(
+            predict({**base, "MAP": 0.95}, "research_replay")["status"],
+            "abstained",
+        )
 
 
 class MaintenanceApiTests(TestCase):
@@ -90,7 +106,15 @@ class MaintenanceApiTests(TestCase):
         self.assertFalse(response.json()["production_ready"])
 
     def test_predict_api_cannot_bypass_source_restrictions(self):
-        for source, expected in (("direct_obd", "prediction_blocked"), ("validated_adapter", "prediction_blocked"), ("research_replay", "prediction_available")):
-            response = self.client.post("/api/v1/analytics/maintenance/predict/", {"inputs": median_inputs(), "source_mode": source}, format="json")
+        for source, expected in (
+            ("direct_obd", "prediction_blocked"),
+            ("validated_adapter", "prediction_blocked"),
+            ("research_replay", "prediction_available"),
+        ):
+            response = self.client.post(
+                "/api/v1/analytics/maintenance/predict/",
+                {"inputs": median_inputs(), "source_mode": source},
+                format="json",
+            )
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()["status"], expected)

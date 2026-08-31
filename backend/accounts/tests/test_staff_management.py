@@ -3,8 +3,8 @@ from urllib.parse import parse_qs, urlsplit
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
-from django.core.cache import cache
 from django.core import mail
+from django.core.cache import cache
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils.encoding import force_bytes
@@ -74,9 +74,12 @@ class StaffManagementTests(TestCase):
         for user in (self.manager, self.dispatcher):
             for method, url, payload in targets:
                 with self.subTest(role=user.staff_profile.role, method=method, url=url):
-                    response = getattr(self.authenticated_client(user), method)(
-                        url, payload, format="json"
-                    ) if payload is not None else getattr(self.authenticated_client(user), method)(url)
+                    if payload is not None:
+                        response = getattr(self.authenticated_client(user), method)(
+                            url, payload, format="json"
+                        )
+                    else:
+                        response = getattr(self.authenticated_client(user), method)(url)
                     self.assertEqual(response.status_code, 403)
         self.assertEqual(APIClient().get(self.managed_url).status_code, 401)
 
