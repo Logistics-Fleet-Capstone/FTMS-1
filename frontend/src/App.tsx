@@ -58,8 +58,8 @@ function LiveFleetVehicleStatusRoute() {
   const { deviceId = "" } = useParams<{ deviceId: string }>();
   return (
     <>
-      <LiveFleetOperationsPage focusedVehicleId={deviceId} />
-      <VehicleStatusPage />
+      <LiveFleetOperationsPage key={`live-map-${deviceId}`} focusedVehicleId={deviceId} />
+      <VehicleStatusPage key={`vehicle-status-${deviceId}`} />
     </>
   );
 }

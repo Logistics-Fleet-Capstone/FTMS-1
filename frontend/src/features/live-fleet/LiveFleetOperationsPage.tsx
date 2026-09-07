@@ -206,13 +206,6 @@ export default function LiveFleetOperationsPage({
   }, [data]);
 
   useEffect(() => {
-    if (!focusedVehicleId) return;
-    setSelectedId(focusedVehicleId);
-    setPopupVehicleId("");
-    setVehiclePanelOpen(false);
-  }, [focusedVehicleId]);
-
-  useEffect(() => {
     const controller = new AbortController();
 
     getDrivers("page_size=100", controller.signal)

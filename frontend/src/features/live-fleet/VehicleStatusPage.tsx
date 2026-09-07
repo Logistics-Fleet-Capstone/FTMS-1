@@ -17,17 +17,26 @@ export default function VehicleStatusPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setState("loading");
+    let active = true;
     getFleetLiveVehicles(controller.signal)
       .then((response) => {
+        if (!active) return;
         const match = response.vehicles.find((item) => item.device_id === deviceId) ?? null;
         setVehicle(match);
         setState(match ? "ready" : "missing");
       })
       .catch((reason) => {
-        if (!(reason instanceof DOMException && reason.name === "AbortError")) setState("error");
+        if (
+          active &&
+          !(reason instanceof DOMException && reason.name === "AbortError")
+        ) {
+          setState("error");
+        }
       });
-    return () => controller.abort();
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [deviceId]);
 
   if (state === "loading") return <LoadingIndicator variant="card" message="Loading vehicle status…" />;
