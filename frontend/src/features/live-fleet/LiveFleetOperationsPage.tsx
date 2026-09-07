@@ -6,17 +6,16 @@ import RequestMap, {
 import { getRequestRoute } from "../transport-requests/api";
 import type { TransportRoute } from "../transport-requests/types";
 import GeofenceWorkspace from "./GeofenceWorkspace";
+import { VehicleStatusDrawer } from "./VehicleStatusPage";
 import {
   getFleetLiveVehicles,
   getFleetSafetyEvents,
-  getFleetVehicleTrail,
   createGeofence as createGeofenceRecord,
   getGeofence,
   getGeofences,
   updateGeofence,
   type FleetLiveResponse,
   type FleetSafetyEvent,
-  type FleetTrailPoint,
   type Geofence,
   type GeofenceCoordinate,
   type GeofenceEvent,
@@ -122,7 +121,11 @@ function NavigatorIcon({
   );
 }
 
-export default function LiveFleetOperationsPage() {
+export default function LiveFleetOperationsPage({
+  focusedVehicleId = "",
+}: {
+  focusedVehicleId?: string;
+}) {
   const [data, setData] = useState<FleetLiveResponse | null>(null);
   const dataRef = useRef<FleetLiveResponse | null>(null);
 
@@ -131,7 +134,8 @@ export default function LiveFleetOperationsPage() {
   >("loading");
 
   const [refreshError, setRefreshError] = useState(false);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(focusedVehicleId);
+  const [statusVehicleId, setStatusVehicleId] = useState("");
   const [filter, setFilter] = useState<FleetFilter>("all");
   const [search, setSearch] = useState("");
 
@@ -139,7 +143,6 @@ export default function LiveFleetOperationsPage() {
   const [routeState, setRouteState] =
     useState<AsyncState>("idle");
 
-  const [trail, setTrail] = useState<FleetTrailPoint[]>([]);
   const [safetyEvents, setSafetyEvents] = useState<
     FleetSafetyEvent[]
   >([]);
@@ -148,9 +151,7 @@ export default function LiveFleetOperationsPage() {
 
   const [popupVehicleId, setPopupVehicleId] = useState("");
 
-  const [vehiclePanelOpen, setVehiclePanelOpen] = useState(true);
-  const [overviewPanelOpen, setOverviewPanelOpen] =
-    useState(true);
+  const [vehiclePanelOpen, setVehiclePanelOpen] = useState(!focusedVehicleId);
 
   const [navigatorView, setNavigatorView] =
     useState<NavigatorView>("vehicles");
@@ -203,6 +204,13 @@ export default function LiveFleetOperationsPage() {
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
+
+  useEffect(() => {
+    if (!focusedVehicleId) return;
+    setSelectedId(focusedVehicleId);
+    setPopupVehicleId("");
+    setVehiclePanelOpen(false);
+  }, [focusedVehicleId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -380,7 +388,10 @@ export default function LiveFleetOperationsPage() {
   const selectedRequestId =
     selected?.active_assignment?.request_id ?? "";
 
-  const selectedVehicleId = selected?.vehicle_id ?? 0;
+  const statusVehicle = data?.vehicles.find(
+    (vehicle) => vehicle.device_id === statusVehicleId,
+  ) ?? null;
+  const mapFocusedVehicleId = focusedVehicleId || statusVehicleId;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -418,47 +429,6 @@ export default function LiveFleetOperationsPage() {
     };
   }, [selectedRequestId]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const timer = window.setTimeout(() => {
-      setTrail([]);
-
-      if (
-        !selectedVehicleId ||
-        !data?.capabilities.telemetry_trail
-      ) {
-        return;
-      }
-
-      getFleetVehicleTrail(
-        selectedVehicleId,
-        controller.signal,
-      )
-        .then((response) => {
-          setTrail(response.points);
-        })
-        .catch((reason) => {
-          if (
-            !(
-              reason instanceof DOMException &&
-              reason.name === "AbortError"
-            )
-          ) {
-            setTrail([]);
-          }
-        });
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [
-    data?.capabilities.telemetry_trail,
-    selectedVehicleId,
-  ]);
-
   const selectVehicle = useCallback(
     (deviceId: string) => {
       setSelectedId(deviceId);
@@ -469,7 +439,6 @@ export default function LiveFleetOperationsPage() {
 
   const openVehiclePopup = useCallback(
     (deviceId: string) => {
-      setTrail([]);
       setSelectedId(deviceId);
       setPopupVehicleId(deviceId);
     },
@@ -503,6 +472,7 @@ export default function LiveFleetOperationsPage() {
                 longitude: vehicle.telemetry.longitude,
                 label: vehicle.display_name,
                 telemetryState: vehicle.telemetry_state,
+                positionSource: vehicle.telemetry.position_source,
                 selected:
                   vehicle.device_id === selectedId,
               },
@@ -526,15 +496,20 @@ export default function LiveFleetOperationsPage() {
           latitude: popupVehicle.telemetry.latitude,
           longitude: popupVehicle.telemetry.longitude,
           speedKph: popupVehicle.telemetry.speed_kph,
+          positionSource: popupVehicle.telemetry.position_source,
+          positionAccuracyM: popupVehicle.telemetry.position_accuracy_m,
+          rpm: popupVehicle.telemetry.rpm,
+          coolantC: popupVehicle.telemetry.coolant_c,
+          engineLoadPct: popupVehicle.telemetry.engine_load_pct,
+          obdSource: popupVehicle.telemetry.obd_source,
           recordedAt: popupVehicle.telemetry.recorded_at,
           ageSeconds: popupVehicle.telemetry.age_seconds,
           driverName:
             popupVehicle.active_assignment?.driver_name,
           assignmentStatus: popupVehicle.active_assignment
-            ? words(
-                popupVehicle.active_assignment
-                  .execution_status,
-              )
+            ? `${popupVehicle.active_assignment.request_number} · ${words(
+                popupVehicle.active_assignment.execution_status,
+              )}`
             : undefined,
           telemetrySource:
             popupVehicle.telemetry.telemetry_source,
@@ -623,29 +598,6 @@ export default function LiveFleetOperationsPage() {
     Boolean(data?.vehicles.length) &&
     data?.vehicles.every((vehicle) => !vehicle.telemetry);
 
-  const fleetCounts = {
-    total: data?.vehicles.length ?? 0,
-    live:
-      data?.vehicles.filter(
-        (vehicle) => vehicle.telemetry_state === "live",
-      ).length ?? 0,
-    attention:
-      data?.vehicles.filter((vehicle) =>
-        ["stale", "offline"].includes(
-          vehicle.telemetry_state,
-        ),
-      ).length ?? 0,
-    assigned:
-      data?.vehicles.filter((vehicle) =>
-        Boolean(vehicle.active_assignment),
-      ).length ?? 0,
-    noTelemetry:
-      data?.vehicles.filter(
-        (vehicle) =>
-          vehicle.telemetry_state === "no_telemetry",
-      ).length ?? 0,
-  };
-
   const startGeofenceDraft = (
     point: GeofenceCoordinate,
   ) => {
@@ -655,7 +607,6 @@ export default function LiveFleetOperationsPage() {
     setGeofenceDrawing(false);
     setGeofencePlacement(false);
     setGeofencePanelOpen(true);
-    setOverviewPanelOpen(false);
     setGeofenceSaveState("idle");
   };
 
@@ -668,7 +619,6 @@ export default function LiveFleetOperationsPage() {
     setGeofenceDrawing(false);
     setGeofencePlacement(false);
     setGeofencePanelOpen(true);
-    setOverviewPanelOpen(false);
 
     setGeofenceActivitySelection(null);
   };
@@ -885,10 +835,16 @@ export default function LiveFleetOperationsPage() {
               route={route}
               routeState={routeState}
               fleetLocations={fleetLocations}
-              fleetTrail={trail}
+              focusedVehicleId={mapFocusedVehicleId || undefined}
               fleetPopup={fleetPopup}
               safetyEvents={safetyEvents}
               onVehicleSelect={openVehiclePopup}
+              onVehicleStatus={(deviceId) => {
+                setSelectedId(deviceId);
+                setPopupVehicleId("");
+                setVehiclePanelOpen(false);
+                setStatusVehicleId(deviceId);
+              }}
               onVehiclePopupClose={() =>
                 setPopupVehicleId("")
               }
@@ -1032,107 +988,12 @@ export default function LiveFleetOperationsPage() {
               type="button"
               aria-expanded={geofencePanelOpen}
               aria-controls="live-fleet-geofence-panel"
-              onClick={() =>
-                setGeofencePanelOpen((open) => {
-                  if (!open) {
-                    setOverviewPanelOpen(false);
-                  }
-
-                  return !open;
-                })
-              }
+              onClick={() => setGeofencePanelOpen((open) => !open)}
             >
               Geofences{" "}
               <span aria-hidden="true">⬡</span>
             </button>
-
-            <button
-              type="button"
-              aria-expanded={overviewPanelOpen}
-              aria-controls="live-fleet-overview-panel"
-              onClick={() =>
-                setOverviewPanelOpen(
-                  (open) => !open,
-                )
-              }
-            >
-              {overviewPanelOpen
-                ? "Hide"
-                : "Show"}{" "}
-              overview{" "}
-              <span aria-hidden="true">
-                {overviewPanelOpen ? "▴" : "▾"}
-              </span>
-            </button>
           </div>
-
-          {overviewPanelOpen && (
-            <section
-              id="live-fleet-overview-panel"
-              className="live-fleet-overview"
-              aria-label="Fleet operations overview"
-            >
-              <header>
-                <div>
-                  <h1>
-                    Live Fleet Operations Map
-                  </h1>
-
-                  <p>
-                    Authoritative vehicle telemetry
-                    with confirmed dispatch and
-                    transport-request context.
-                  </p>
-                </div>
-
-                <time dateTime={data.generated_at}>
-                  Updated{" "}
-                  {new Date(
-                    data.generated_at,
-                  ).toLocaleTimeString()}
-                </time>
-              </header>
-
-              <div className="live-fleet-kpis">
-                <article>
-                  <strong>
-                    {fleetCounts.total}
-                  </strong>
-                  <span>Total vehicles</span>
-                </article>
-
-                <article>
-                  <strong>
-                    {fleetCounts.live}
-                  </strong>
-                  <span>Live telemetry</span>
-                </article>
-
-                <article>
-                  <strong>
-                    {fleetCounts.attention}
-                  </strong>
-                  <span>Stale / offline</span>
-                </article>
-
-                <article>
-                  <strong>
-                    {fleetCounts.assigned}
-                  </strong>
-                  <span>
-                    Active assignments
-                  </span>
-                </article>
-
-                <article>
-                  <strong>
-                    {fleetCounts.noTelemetry}
-                  </strong>
-                  <span>No telemetry</span>
-                </article>
-              </div>
-            </section>
-          )}
 
           {vehiclePanelOpen && (
             <aside
@@ -1140,6 +1001,10 @@ export default function LiveFleetOperationsPage() {
               className="live-fleet-list live-fleet-navigator"
               aria-label="Fleet navigator"
             >
+              <div
+                className="live-fleet-navigator-header"
+                data-testid="fleet-navigator-header"
+              >
               <nav
                 className="live-fleet-navigator-tabs"
                 aria-label="Fleet navigator shortcuts"
@@ -1332,8 +1197,12 @@ export default function LiveFleetOperationsPage() {
                   ))}
                 </div>
               )}
+              </div>
 
-              <div className="live-fleet-rows">
+              <div
+                className="live-fleet-rows"
+                data-testid="fleet-navigator-scroll-region"
+              >
                 {navigatorView ===
                   "vehicles" &&
                   (data.vehicles.length ===
@@ -1581,7 +1450,7 @@ export default function LiveFleetOperationsPage() {
                 )}
               </div>
 
-              <footer>
+              <footer data-testid="fleet-navigator-footer">
                 <span>
                   {navigatorView ===
                   "vehicles"
@@ -1657,6 +1526,12 @@ export default function LiveFleetOperationsPage() {
             }
           />
         </div>
+      )}
+      {statusVehicle && (
+        <VehicleStatusDrawer
+          vehicle={statusVehicle}
+          onClose={() => setStatusVehicleId("")}
+        />
       )}
     </section>
   );
