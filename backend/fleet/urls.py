@@ -11,6 +11,7 @@ from .views import (
     VehicleInspectionDetailView,
     VehicleInspectionListView,
     VehicleListView,
+    VehiclePhotoView,
     VehicleMaintenanceDetailView,
     VehicleMaintenanceListView,
     VehicleMaintenanceTransitionView,
@@ -35,6 +36,7 @@ urlpatterns = [
     ),
     path("", VehicleListView.as_view(), name="vehicle-list"),
     path("<str:device_id>/", VehicleDetailView.as_view(), name="vehicle-detail"),
+    path("<str:device_id>/photo/", VehiclePhotoView.as_view(), name="vehicle-photo"),
     path("<str:device_id>/deactivate/", DeactivateVehicleView.as_view(), name="vehicle-deactivate"),
     path("<str:device_id>/reactivate/", ReactivateVehicleView.as_view(), name="vehicle-reactivate"),
     path(
