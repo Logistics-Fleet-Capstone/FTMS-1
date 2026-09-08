@@ -246,7 +246,11 @@ class VehicleSerializer(StrictFieldsMixin, serializers.ModelSerializer):
         request = self.context.get("request")
         enforce_json_types = request is None or request.content_type == "application/json"
         for field in string_fields:
-            if enforce_json_types and field in self.initial_data and not isinstance(self.initial_data[field], str):
+            if (
+                enforce_json_types
+                and field in self.initial_data
+                and not isinstance(self.initial_data[field], str)
+            ):
                 errors[field] = "Must be a string."
         for field in ("model_year", "passenger_capacity"):
             value = self.initial_data.get(field)
@@ -259,7 +263,12 @@ class VehicleSerializer(StrictFieldsMixin, serializers.ModelSerializer):
                 errors[field] = "Must be an integer or null."
         for field in ("payload_capacity_kg", "gvwr_kg"):
             value = self.initial_data.get(field)
-            if enforce_json_types and field in self.initial_data and value is not None and isinstance(value, bool):
+            if (
+                enforce_json_types
+                and field in self.initial_data
+                and value is not None
+                and isinstance(value, bool)
+            ):
                 errors[field] = "Must be a decimal number or null."
         if self.instance is None and "is_active" in self.initial_data:
             errors["is_active"] = "This field is not accepted."

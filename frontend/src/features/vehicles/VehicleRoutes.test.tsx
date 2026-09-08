@@ -54,9 +54,9 @@ test("shows exact validation reasons in their vehicle section", async () => {
   }));
   render(<MemoryRouter><VehicleForm editing embedded initialVehicle={vehicle} targetDeviceId="PHOTO-001" /></MemoryRouter>);
   fireEvent.click(screen.getByRole("button", { name: "Save vehicle" }));
-  expect(await screen.findByText("Identity", { selector: ".vehicle-form-section-error strong" })).toBeInTheDocument();
-  expect(screen.getAllByText(/Only JPG, JPEG, PNG, and WebP/)).toHaveLength(2);
-  expect(screen.getByText("Vehicle Specifications", { selector: ".vehicle-form-section-error strong" })).toBeInTheDocument();
+  expect(await screen.findByText("Vehicle Specifications", { selector: ".vehicle-form-section-error strong" })).toBeInTheDocument();
+  expect(screen.queryByText("Identity", { selector: ".vehicle-form-section-error strong" })).not.toBeInTheDocument();
+  expect(screen.getAllByText(/Only JPG, JPEG, PNG, and WebP/)).toHaveLength(1);
   expect(screen.getByText(/Must be between 1980 and next year/)).toBeInTheDocument();
   expect(screen.queryByText("Please correct the vehicle information.")).not.toBeInTheDocument();
 });

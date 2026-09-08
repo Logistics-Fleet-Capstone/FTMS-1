@@ -206,12 +206,13 @@ const vehicleErrorSections = [
   ["Ownership & Acquisition", ["ownership_type", "supplier_name", "purchase_order_number", "acquisition_date", "purchase_price", "purchase_currency", "warranty_expiry_date"]],
   ["Registration & Insurance", ["registration_expiry_date", "insurance_expiry_date"]],
 ] as const;
+const inlineVehicleErrorFields = new Set(["device_id", "display_name", "plate_number", "photo"]);
 
 function VehicleFormErrors({ errors }: { errors: Record<string, string> }) {
   const knownFields = new Set<string>(vehicleErrorSections.flatMap(([, fields]) => fields));
   const sections = vehicleErrorSections.map(([title, fields]) => ({
     title,
-    errors: fields.flatMap(field => errors[field] ? [[humanize(field), errors[field]]] : []),
+    errors: fields.flatMap(field => errors[field] && !inlineVehicleErrorFields.has(field) ? [[humanize(field), errors[field]]] : []),
   }));
   const general = Object.entries(errors).filter(([field]) => !knownFields.has(field));
   if (!sections.some(section => section.errors.length) && !general.length) return null;

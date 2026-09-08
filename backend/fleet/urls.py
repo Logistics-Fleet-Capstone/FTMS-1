@@ -11,10 +11,10 @@ from .views import (
     VehicleInspectionDetailView,
     VehicleInspectionListView,
     VehicleListView,
-    VehiclePhotoView,
     VehicleMaintenanceDetailView,
     VehicleMaintenanceListView,
     VehicleMaintenanceTransitionView,
+    VehiclePhotoView,
 )
 
 urlpatterns = [

@@ -9,7 +9,6 @@ from rest_framework.test import APIClient
 from accounts.models import StaffProfile
 from fleet.models import Vehicle
 
-
 TEMP_MEDIA_ROOT = tempfile.mkdtemp()
 
 
